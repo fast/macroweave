@@ -161,8 +161,15 @@ impl Parse for ForClause {
 
         let rows = if input.peek(syn::token::Bracket) {
             let row_values;
-            bracketed!(row_values in input);
-            parse_rows(&row_values, &vars)?
+            let bracket_token = bracketed!(row_values in input);
+            let rows = parse_rows(&row_values, &vars)?;
+            if rows.is_empty() {
+                return Err(Error::new(
+                    bracket_token.span.join(),
+                    "input list must contain at least one row",
+                ));
+            }
+            rows
         } else {
             parse_range_rows(input, &vars)?
         };
@@ -179,6 +186,7 @@ struct RangeInput {
     end: u64,
     inclusive: bool,
     format: RangeFormat,
+    tokens: TokenStream,
 }
 
 impl RangeInput {
@@ -207,22 +215,22 @@ impl RangeInput {
 impl Parse for RangeInput {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let start = input.parse::<RangeBound>()?;
-        let inclusive = if input.peek(Token![..=]) {
-            input.parse::<Token![..=]>()?;
-            true
+        let (inclusive, operator) = if input.peek(Token![..=]) {
+            (true, input.parse::<Token![..=]>()?.into_token_stream())
         } else {
-            input.parse::<Token![..]>()?;
-            false
+            (false, input.parse::<Token![..]>()?.into_token_stream())
         };
         let end = input.parse::<RangeBound>()?;
 
         let format = RangeFormat::from_bounds(&start, &end)?;
+        let tokens = TokenStream::from_iter([start.tokens(), operator, end.tokens()]);
 
         Ok(Self {
             start: start.value,
             end: end.value,
             inclusive,
             format,
+            tokens,
         })
     }
 }
@@ -507,9 +515,15 @@ impl Parse for TemplateVars {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let idents = if input.peek(syn::token::Paren) {
             let content;
-            parenthesized!(content in input);
-
-            parse_var_list(&content)?
+            let paren_token = parenthesized!(content in input);
+            let idents = parse_var_list(&content)?;
+            if idents.is_empty() {
+                return Err(Error::new(
+                    paren_token.span.join(),
+                    "expected at least one template variable",
+                ));
+            }
+            idents
         } else if let Ok(ident) = input.parse::<Ident>() {
             vec![ident]
         } else {
@@ -518,9 +532,6 @@ impl Parse for TemplateVars {
         };
 
         let vars = Self { idents };
-        if vars.idents.is_empty() {
-            return Err(input.error("expected at least one template variable"));
-        }
         vars.validate()?;
         Ok(vars)
     }
@@ -540,9 +551,16 @@ fn parse_range_rows(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Vec<R
     }
 
     let var = &vars.idents[0];
-    input
-        .parse::<RangeInput>()?
-        .values()
+    let range = input.parse::<RangeInput>()?;
+    let values = range.values();
+    if values.is_empty() {
+        return Err(Error::new_spanned(
+            range.tokens,
+            "range input must contain at least one value",
+        ));
+    }
+
+    values
         .into_iter()
         .map(|value| Ok(Row::single(var, value)))
         .collect()

@@ -1,0 +1,5 @@
+error: expected at least one template variable
+ --> tests/ui/empty_template_variables.rs:5:13
+  |
+5 |         for () in [] {
+  |             ^^

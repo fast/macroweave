@@ -20,12 +20,6 @@ template! {
     }
 }
 
-template! {
-    for T in [] {
-        const _: &'static str = stringify!(T);
-    }
-}
-
 trait TypeTag {
     const TAG: u8;
 }
@@ -379,19 +373,6 @@ fn preserves_integer_range_suffix() {
     }
 
     assert_eq!(values, [0, 1, 2]);
-}
-
-#[test]
-fn expands_empty_range_input_to_no_tokens() {
-    let total = 0;
-
-    template! {
-        for N in 0..0 {
-            total += N;
-        }
-    }
-
-    assert_eq!(total, 0);
 }
 
 trait Kernel<T> {
