@@ -111,19 +111,16 @@ impl SourceRow {
         Self { replacements }
     }
 
-    fn zip_placeholders(
-        placeholders: &Placeholders,
-        values: Vec<TokenStream>,
-    ) -> Result<Self> {
+    fn zip_placeholders(placeholders: &Placeholders, values: Vec<TokenStream>) -> Result<Self> {
         let expected = placeholders.len();
         let found = values.len();
         if expected != found {
             let mut error = Error::new_spanned(
-                join_tokens(values.iter().cloned()),
+                TokenStream::from_iter(values.clone()),
                 format!("this row provides {}", replacement_value_count(found)),
             );
             error.combine(Error::new_spanned(
-                placeholders.tokens.clone(),
+                placeholders,
                 format!(
                     "placeholders `{}` require {}",
                     placeholders.display(),
@@ -295,7 +292,7 @@ impl RangeFormat {
             (Self::Byte, Self::Byte) => Ok(Self::Byte),
             (Self::Character, Self::Character) => Ok(Self::Character),
             _ => Err(Error::new_spanned(
-                join_tokens([start.tokens(), end.tokens()]),
+                TokenStream::from_iter([start.tokens(), end.tokens()]),
                 "range source bounds must both be integer literals, both byte literals, or both character literals",
             )),
         }
@@ -477,7 +474,12 @@ fn cartesian_product_rows(sources: Vec<Vec<SourceRow>>) -> Vec<SourceRow> {
 }
 struct Placeholders {
     idents: Vec<Ident>,
-    tokens: TokenStream,
+}
+
+impl ToTokens for Placeholders {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.extend(self.idents.clone());
+    }
 }
 
 impl Placeholders {
@@ -520,19 +522,17 @@ impl Parse for Placeholders {
             ));
         }
 
-        let (idents, tokens) = if input.peek(syn::token::Paren) {
+        let idents = if input.peek(syn::token::Paren) {
             let content;
             parenthesized!(content in input);
-            let idents = parse_placeholder_list(&content)?;
-            let tokens = join_tokens(idents.iter().map(ToTokens::to_token_stream));
-            (idents, tokens)
+
+            parse_placeholder_list(&content)?
         } else {
             let ident = input.parse::<Ident>()?;
-            let tokens = ident.clone().into_token_stream();
-            (vec![ident], tokens)
+            vec![ident]
         };
 
-        let placeholders = Self { idents, tokens };
+        let placeholders = Self { idents };
         if placeholders.idents.is_empty() {
             return Err(input.error("expected at least one template placeholder"));
         }
@@ -633,13 +633,6 @@ fn parse_tokens_until_comma(input: ParseStream<'_>) -> Result<TokenStream> {
     }
 
     Ok(tokens.into_iter().collect())
-}
-
-fn join_tokens(tokens: impl IntoIterator<Item = TokenStream>) -> TokenStream {
-    tokens
-        .into_iter()
-        .map(TokenStream::into_token_stream)
-        .collect()
 }
 
 fn replacement_value_count(count: usize) -> String {
