@@ -96,8 +96,10 @@ impl Template {
             .map(|src| src.replacements.as_slice())
             .collect::<Vec<_>>();
 
-        if contains_splice_block(template.clone()) {
-            return Ok(expand_splice_blocks(&replacements, template));
+        let mut found_splice = false;
+        let expanded = expand_splice_blocks(&replacements, template.clone(), &mut found_splice);
+        if found_splice {
+            return Ok(expanded);
         }
 
         let mut output = TokenStream::new();
@@ -135,74 +137,54 @@ fn replace_token_stream(tokens: TokenStream, replacements: &[Replacement]) -> To
         .collect()
 }
 
-fn contains_splice_block(tokens: TokenStream) -> bool {
-    let mut tokens = tokens.into_iter().peekable();
-
-    while let Some(token) = tokens.next() {
-        match token {
-            TokenTree::Punct(at) if at.as_char() == '@' => {
-                let mut lookahead = tokens.clone();
-                if splice_block(&mut lookahead).is_some() {
-                    return true;
-                }
-            }
-            TokenTree::Group(group) if contains_splice_block(group.stream()) => {
-                return true;
-            }
-            _ => {}
-        }
-    }
-
-    false
-}
-
 fn expand_splice_blocks(
     replacements_by_row: &[&[Replacement]],
     tokens: TokenStream,
+    found_splice: &mut bool,
 ) -> TokenStream {
-    let mut output = TokenStream::new();
-    let mut tokens = tokens.into_iter().peekable();
+    let mut tokens = tokens.into_iter().collect::<Vec<_>>();
 
-    while let Some(token) = tokens.next() {
-        match token {
-            TokenTree::Punct(at) if at.as_char() == '@' => {
-                let mut lookahead = tokens.clone();
-                if let Some(template) = splice_block(&mut lookahead) {
-                    tokens = lookahead;
-                    for row_replacements in replacements_by_row {
-                        output.extend(replace_token_stream(template.clone(), row_replacements));
-                    }
-                    continue;
-                }
-
-                output.extend(at.into_token_stream());
-            }
-            TokenTree::Group(group) => {
-                let content = expand_splice_blocks(replacements_by_row, group.stream());
-
-                let mut new_group = Group::new(group.delimiter(), content);
-                new_group.set_span(group.span());
-                output.extend(new_group.into_token_stream());
-            }
-            other => output.extend(other.into_token_stream()),
+    let mut i = 0;
+    while i < tokens.len() {
+        if let TokenTree::Group(group) = &mut tokens[i] {
+            let content = expand_splice_blocks(replacements_by_row, group.stream(), found_splice);
+            let mut new_group = Group::new(group.delimiter(), content);
+            new_group.set_span(group.span());
+            *group = new_group;
+            i += 1;
+            continue;
         }
+
+        let Some(template) = enter_splice_block(&tokens[i..]) else {
+            i += 1;
+            continue;
+        };
+
+        *found_splice = true;
+        let mut repeated = Vec::new();
+        for row_replacements in replacements_by_row {
+            repeated.extend(replace_token_stream(template.clone(), row_replacements));
+        }
+
+        let repeated_len = repeated.len();
+        tokens.splice(i..i + 3, repeated);
+        i += repeated_len;
     }
 
-    output
+    tokens.into_iter().collect()
 }
 
-fn splice_block(tokens: &mut impl Iterator<Item = TokenTree>) -> Option<TokenStream> {
-    let Some(TokenTree::Ident(ident)) = tokens.next() else {
+fn enter_splice_block(tokens: &[TokenTree]) -> Option<TokenStream> {
+    let [
+        TokenTree::Punct(at),
+        TokenTree::Ident(ident),
+        TokenTree::Group(group),
+        ..,
+    ] = tokens
+    else {
         return None;
     };
-    if ident != "splice" {
-        return None;
-    }
-
-    let Some(TokenTree::Group(group)) = tokens.next() else {
-        return None;
-    };
-    if group.delimiter() != Delimiter::Brace {
+    if at.as_char() != '@' || ident != "splice" || group.delimiter() != Delimiter::Brace {
         return None;
     }
     Some(group.stream())
