@@ -47,9 +47,11 @@ impl SourceRow {
     }
 
     fn merge(&self, other: &Self) -> Self {
-        Self {
-            replacements: [self.replacements.clone(), other.replacements.clone()].concat(),
-        }
+        let mut replacements = self.replacements.clone();
+        replacements.extend(other.replacements.iter().cloned());
+        replacements.sort_by(|left, right| left.placeholder().cmp(right.placeholder()));
+
+        Self { replacements }
     }
 
     fn zip_placeholders(placeholders: &Placeholders, values: Vec<TokenStream>) -> Result<Self> {
@@ -63,13 +65,14 @@ impl SourceRow {
             ));
         }
 
-        let replacements = placeholders
+        let mut replacements = placeholders
             .idents
             .iter()
             .cloned()
             .zip(values)
             .map(|(placeholder, value)| Replacement::new(placeholder, value))
             .collect::<Vec<_>>();
+        replacements.sort_by(|left, right| left.placeholder().cmp(right.placeholder()));
 
         Ok(Self { replacements })
     }
@@ -408,18 +411,25 @@ fn validate_source_placeholders(
     new_placeholders: &[Ident],
     existing_placeholders: &mut Vec<Ident>,
 ) -> Result<()> {
-    for placeholder in new_placeholders {
-        if existing_placeholders
-            .iter()
-            .any(|previous| previous == placeholder)
-        {
-            return Err(Error::new_spanned(
-                placeholder,
-                "duplicate source placeholder",
+    existing_placeholders.extend_from_slice(new_placeholders);
+    existing_placeholders.sort();
+
+    for placeholders in existing_placeholders.windows(2) {
+        let previous = &placeholders[0];
+        let duplicate = &placeholders[1];
+        if previous == duplicate {
+            let mut error = Error::new_spanned(
+                duplicate,
+                format!("the placeholder `{duplicate}` duplicates an earlier one"),
+            );
+            error.combine(Error::new_spanned(
+                previous,
+                format!("an earlier placeholder `{previous}` declared here"),
             ));
+            return Err(error);
         }
-        existing_placeholders.push(placeholder.clone());
     }
+
     Ok(())
 }
 

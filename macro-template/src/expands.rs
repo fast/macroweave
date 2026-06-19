@@ -36,11 +36,15 @@ pub struct Replacement {
 }
 
 impl Replacement {
-    pub fn new(placeholder: Ident, tokens: TokenStream) -> Self {
+    pub(crate) fn new(placeholder: Ident, tokens: TokenStream) -> Self {
         Self {
             placeholder,
             tokens,
         }
+    }
+
+    pub(crate) fn placeholder(&self) -> &Ident {
+        &self.placeholder
     }
 }
 
@@ -121,15 +125,11 @@ fn replace_token_stream(replacements: &[Replacement], tokens: TokenStream) -> To
                 new_tokens.extend([TokenTree::Group(new_group)]);
             }
             TokenTree::Ident(ident) => {
-                let mut found_replacement = false;
-                for replacement in replacements {
-                    if ident == replacement.placeholder {
-                        new_tokens.extend(replacement.tokens.clone());
-                        found_replacement = true;
-                        break;
-                    }
-                }
-                if !found_replacement {
+                if let Ok(index) = replacements
+                    .binary_search_by(|replacement| replacement.placeholder().cmp(&ident))
+                {
+                    new_tokens.extend(replacements[index].tokens.clone());
+                } else {
                     new_tokens.extend([TokenTree::Ident(ident)]);
                 }
             }
