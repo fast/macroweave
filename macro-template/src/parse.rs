@@ -29,26 +29,26 @@ use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 
 #[derive(Clone)]
-pub struct Replacement {
-    pub placeholder: Ident,
+pub struct Binding {
+    pub var: Ident,
     pub tokens: TokenStream,
 }
 
 pub struct Template {
-    pub rows: Vec<SourceRow>,
+    pub rows: Vec<Row>,
     pub template: TokenStream,
 }
 
 impl Parse for Template {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let mut sources = vec![];
-        let mut placeholders = vec![];
+        let mut clauses = vec![];
+        let mut vars = vec![];
 
         loop {
             input.parse::<Token![for]>()?;
-            let source = input.parse::<Source>()?;
-            validate_source_placeholders(&source.placeholders, &mut placeholders)?;
-            sources.push(source.rows);
+            let clause = input.parse::<ForClause>()?;
+            validate_clause_vars(&clause.vars, &mut vars)?;
+            clauses.push(clause.rows);
 
             if !input.peek(Token![,]) {
                 break;
@@ -62,14 +62,16 @@ impl Parse for Template {
             if input.peek(syn::token::Brace) {
                 break;
             } else {
-                return Err(input.error("expected another source after comma"));
+                return Err(input.error("expected another input clause after comma"));
             }
         }
 
-        let rows = if sources.len() == 1 {
-            sources.pop().expect("source list should not be empty")
+        let rows = if clauses.len() == 1 {
+            clauses
+                .pop()
+                .expect("input clause list should not be empty")
         } else {
-            cartesian_product_rows(sources)
+            cartesian_product_rows(clauses)
         };
 
         let template;
@@ -83,36 +85,34 @@ impl Parse for Template {
     }
 }
 
-pub struct SourceRow {
-    pub replacements: Vec<Replacement>,
+pub struct Row {
+    pub bindings: Vec<Binding>,
 }
 
-impl SourceRow {
+impl Row {
     fn empty() -> Self {
-        Self {
-            replacements: vec![],
-        }
+        Self { bindings: vec![] }
     }
 
-    fn single(placeholder: &Ident, value: TokenStream) -> Self {
+    fn single(var: &Ident, value: TokenStream) -> Self {
         Self {
-            replacements: vec![Replacement {
-                placeholder: placeholder.clone(),
+            bindings: vec![Binding {
+                var: var.clone(),
                 tokens: value,
             }],
         }
     }
 
     fn merge(&self, other: &Self) -> Self {
-        let mut replacements = self.replacements.clone();
-        replacements.extend(other.replacements.iter().cloned());
-        replacements.sort_by(|left, right| left.placeholder.cmp(&right.placeholder));
+        let mut bindings = self.bindings.clone();
+        bindings.extend(other.bindings.iter().cloned());
+        bindings.sort_by(|left, right| left.var.cmp(&right.var));
 
-        Self { replacements }
+        Self { bindings }
     }
 
-    fn zip_placeholders(placeholders: &Placeholders, values: Vec<TokenStream>) -> Result<Self> {
-        let expected = placeholders.len();
+    fn zip_vars(vars: &TemplateVars, values: Vec<TokenStream>) -> Result<Self> {
+        let expected = vars.len();
         let found = values.len();
         if expected != found {
             let mut error = Error::new_spanned(
@@ -124,10 +124,10 @@ impl SourceRow {
                 ),
             );
             error.combine(Error::new_spanned(
-                placeholders,
+                vars,
                 format!(
-                    "placeholders `{}` require {} value{}",
-                    placeholders.display(),
+                    "template variables `{}` require {} row value{}",
+                    vars.display(),
                     expected,
                     if expected == 1 { "" } else { "s" }
                 ),
@@ -135,56 +135,53 @@ impl SourceRow {
             return Err(error);
         }
 
-        let mut replacements = placeholders
+        let mut bindings = vars
             .idents
             .iter()
             .cloned()
             .zip(values)
-            .map(|(placeholder, value)| Replacement {
-                placeholder,
-                tokens: value,
-            })
+            .map(|(var, value)| Binding { var, tokens: value })
             .collect::<Vec<_>>();
-        replacements.sort_by(|left, right| left.placeholder.cmp(&right.placeholder));
+        bindings.sort_by(|left, right| left.var.cmp(&right.var));
 
-        Ok(Self { replacements })
+        Ok(Self { bindings })
     }
 }
 
-struct Source {
-    placeholders: Vec<Ident>,
-    rows: Vec<SourceRow>,
+struct ForClause {
+    vars: Vec<Ident>,
+    rows: Vec<Row>,
 }
 
-impl Parse for Source {
+impl Parse for ForClause {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let placeholders = input.parse::<Placeholders>()?;
-        let placeholder_idents = placeholders.idents.clone();
+        let vars = input.parse::<TemplateVars>()?;
+        let var_idents = vars.idents.clone();
         input.parse::<Token![in]>()?;
 
         let rows = if input.peek(syn::token::Bracket) {
-            let source;
-            bracketed!(source in input);
-            parse_source_rows(&source, &placeholders)?
+            let row_values;
+            bracketed!(row_values in input);
+            parse_rows(&row_values, &vars)?
         } else {
-            parse_range_source_rows(input, &placeholders)?
+            parse_range_rows(input, &vars)?
         };
 
         Ok(Self {
-            placeholders: placeholder_idents,
+            vars: var_idents,
             rows,
         })
     }
 }
 
-struct RangeSource {
+struct RangeInput {
     start: u64,
     end: u64,
     inclusive: bool,
     format: RangeFormat,
 }
 
-impl RangeSource {
+impl RangeInput {
     fn values(&self) -> Vec<TokenStream> {
         let mut values = vec![];
         if self.start > self.end || (!self.inclusive && self.start == self.end) {
@@ -207,7 +204,7 @@ impl RangeSource {
     }
 }
 
-impl Parse for RangeSource {
+impl Parse for RangeInput {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let start = input.parse::<RangeBound>()?;
         let inclusive = if input.peek(Token![..=]) {
@@ -261,7 +258,7 @@ impl Parse for RangeBound {
             }),
             _ => Err(Error::new_spanned(
                 tokens,
-                "range source bounds must be integer, byte, or character literals",
+                "range bounds must be integer, byte, or character literals",
             )),
         }
     }
@@ -298,7 +295,7 @@ impl RangeFormat {
             (Self::Character, Self::Character) => Ok(Self::Character),
             _ => Err(Error::new_spanned(
                 TokenStream::from_iter([start.tokens(), end.tokens()]),
-                "range source bounds must both be integer literals, both byte literals, or both character literals",
+                "range bounds must both be integer literals, both byte literals, or both character literals",
             )),
         }
     }
@@ -324,7 +321,7 @@ impl IntegerFormat {
         } else {
             return Err(Error::new_spanned(
                 end_tokens,
-                "range source bounds must use the same integer suffix",
+                "range bounds must use the same integer suffix",
             ));
         };
 
@@ -339,7 +336,7 @@ impl IntegerFormat {
         } else {
             return Err(Error::new_spanned(
                 end_tokens,
-                "range source bounds must use the same integer radix",
+                "range bounds must use the same integer radix",
             ));
         };
 
@@ -403,27 +400,17 @@ fn parse_integer_bound(value: syn::LitInt) -> Result<RangeBound> {
             }
             'a'..='f' | 'A'..='F' if base == 16 => digits.push(ch),
             _ => {
-                return Err(Error::new_spanned(
-                    tokens,
-                    "expected integer range source bound",
-                ));
+                return Err(Error::new_spanned(tokens, "expected integer range bound"));
             }
         }
     }
 
     if digits.is_empty() {
-        return Err(Error::new_spanned(
-            tokens,
-            "expected integer range source bound",
-        ));
+        return Err(Error::new_spanned(tokens, "expected integer range bound"));
     }
 
-    let parsed = u64::from_str_radix(&digits, base).map_err(|_| {
-        Error::new_spanned(
-            tokens.clone(),
-            "integer range source bounds must fit in u64",
-        )
-    })?;
+    let parsed = u64::from_str_radix(&digits, base)
+        .map_err(|_| Error::new_spanned(tokens.clone(), "integer range bounds must fit in u64"))?;
 
     Ok(RangeBound {
         value: parsed,
@@ -436,24 +423,21 @@ fn parse_integer_bound(value: syn::LitInt) -> Result<RangeBound> {
     })
 }
 
-fn validate_source_placeholders(
-    new_placeholders: &[Ident],
-    existing_placeholders: &mut Vec<Ident>,
-) -> Result<()> {
-    existing_placeholders.extend_from_slice(new_placeholders);
-    existing_placeholders.sort();
+fn validate_clause_vars(new_vars: &[Ident], existing_vars: &mut Vec<Ident>) -> Result<()> {
+    existing_vars.extend_from_slice(new_vars);
+    existing_vars.sort();
 
-    for placeholders in existing_placeholders.windows(2) {
-        let previous = &placeholders[0];
-        let duplicate = &placeholders[1];
+    for vars in existing_vars.windows(2) {
+        let previous = &vars[0];
+        let duplicate = &vars[1];
         if previous == duplicate {
             let mut error = Error::new_spanned(
                 duplicate,
-                format!("the placeholder `{duplicate}` duplicates an earlier one"),
+                format!("the template variable `{duplicate}` duplicates an earlier one"),
             );
             error.combine(Error::new_spanned(
                 previous,
-                format!("an earlier placeholder `{previous}` declared here"),
+                format!("an earlier template variable `{previous}` declared here"),
             ));
             return Err(error);
         }
@@ -462,13 +446,13 @@ fn validate_source_placeholders(
     Ok(())
 }
 
-fn cartesian_product_rows(sources: Vec<Vec<SourceRow>>) -> Vec<SourceRow> {
-    let mut rows = vec![SourceRow::empty()];
+fn cartesian_product_rows(clauses: Vec<Vec<Row>>) -> Vec<Row> {
+    let mut rows = vec![Row::empty()];
 
-    for source_rows in sources {
+    for clause_rows in clauses {
         let mut next_rows = vec![];
         for base in &rows {
-            for row in &source_rows {
+            for row in &clause_rows {
                 next_rows.push(base.merge(row));
             }
         }
@@ -477,17 +461,17 @@ fn cartesian_product_rows(sources: Vec<Vec<SourceRow>>) -> Vec<SourceRow> {
 
     rows
 }
-struct Placeholders {
+struct TemplateVars {
     idents: Vec<Ident>,
 }
 
-impl ToTokens for Placeholders {
+impl ToTokens for TemplateVars {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(self.idents.clone());
     }
 }
 
-impl Placeholders {
+impl TemplateVars {
     fn len(&self) -> usize {
         self.idents.len()
     }
@@ -498,7 +482,7 @@ impl Placeholders {
                 .iter()
                 .any(|previous| previous == ident)
             {
-                return Err(Error::new_spanned(ident, "duplicate template placeholder"));
+                return Err(Error::new_spanned(ident, "duplicate template variable"));
             }
         }
         Ok(())
@@ -519,65 +503,58 @@ impl Placeholders {
     }
 }
 
-impl Parse for Placeholders {
+impl Parse for TemplateVars {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         if input.peek(syn::token::Bracket) {
-            return Err(input.error(
-                "multiple template placeholders must use parentheses, such as `(Ty, Width)`",
-            ));
+            return Err(input
+                .error("multiple template variables must use parentheses, such as `(Ty, Width)`"));
         }
 
         let idents = if input.peek(syn::token::Paren) {
             let content;
             parenthesized!(content in input);
 
-            parse_placeholder_list(&content)?
+            parse_var_list(&content)?
         } else {
             let ident = input.parse::<Ident>()?;
             vec![ident]
         };
 
-        let placeholders = Self { idents };
-        if placeholders.idents.is_empty() {
-            return Err(input.error("expected at least one template placeholder"));
+        let vars = Self { idents };
+        if vars.idents.is_empty() {
+            return Err(input.error("expected at least one template variable"));
         }
-        placeholders.validate()?;
-        Ok(placeholders)
+        vars.validate()?;
+        Ok(vars)
     }
 }
 
-fn parse_placeholder_list(input: ParseStream<'_>) -> Result<Vec<Ident>> {
+fn parse_var_list(input: ParseStream<'_>) -> Result<Vec<Ident>> {
     let idents = Punctuated::<Ident, Token![,]>::parse_terminated(input)?;
     Ok(idents.into_iter().collect())
 }
 
-fn parse_range_source_rows(
-    input: ParseStream<'_>,
-    placeholders: &Placeholders,
-) -> Result<Vec<SourceRow>> {
-    if placeholders.len() != 1 {
+fn parse_range_rows(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Vec<Row>> {
+    if vars.len() != 1 {
         return Err(Error::new_spanned(
-            &placeholders.idents[0],
-            "range sources require exactly one template placeholder",
+            &vars.idents[0],
+            "range inputs require exactly one template variable",
         ));
     }
 
-    let placeholder = &placeholders.idents[0];
+    let var = &vars.idents[0];
     input
-        .parse::<RangeSource>()?
+        .parse::<RangeInput>()?
         .values()
         .into_iter()
-        .map(|value| Ok(SourceRow::single(placeholder, value)))
+        .map(|value| Ok(Row::single(var, value)))
         .collect()
 }
 
-fn parse_source_rows(
-    input: ParseStream<'_>,
-    placeholders: &Placeholders,
-) -> Result<Vec<SourceRow>> {
+fn parse_rows(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Vec<Row>> {
     let mut rows = vec![];
     while !input.is_empty() {
-        rows.push(parse_source_row(input, placeholders)?);
+        rows.push(parse_row(input, vars)?);
         if input.is_empty() {
             break;
         }
@@ -586,29 +563,30 @@ fn parse_source_rows(
     Ok(rows)
 }
 
-fn parse_source_row(input: ParseStream<'_>, placeholders: &Placeholders) -> Result<SourceRow> {
-    if placeholders.len() > 1 {
+fn parse_row(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Row> {
+    if vars.len() > 1 {
         if !input.peek(syn::token::Paren) {
-            return Err(input
-                .error("multi-placeholder source rows must use parentheses, such as `(u16, 2)`"));
+            return Err(input.error(
+                "rows for multiple template variables must use parentheses, such as `(u16, 2)`",
+            ));
         }
 
         let row;
         parenthesized!(row in input);
         let values = parse_row_values(&row)?;
         if !row.is_empty() {
-            return Err(row.error("unexpected tokens in template row"));
+            return Err(row.error("unexpected tokens in row"));
         }
-        return SourceRow::zip_placeholders(placeholders, values);
+        return Row::zip_vars(vars, values);
     }
 
     let value = parse_tokens_until_comma(input)?;
 
-    match placeholders.len() {
-        1 => Ok(SourceRow::single(&placeholders.idents[0], value)),
+    match vars.len() {
+        1 => Ok(Row::single(&vars.idents[0], value)),
         _ => Err(Error::new_spanned(
-            &placeholders.idents[0],
-            "plain rows require exactly one placeholder",
+            &vars.idents[0],
+            "plain rows require exactly one template variable",
         )),
     }
 }
@@ -634,7 +612,7 @@ fn parse_tokens_until_comma(input: ParseStream<'_>) -> Result<TokenStream> {
     }
 
     if tokens.is_empty() {
-        return Err(input.error("expected replacement tokens"));
+        return Err(input.error("expected row value tokens"));
     }
 
     Ok(tokens.into_iter().collect())

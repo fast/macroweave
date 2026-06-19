@@ -1,5 +1,0 @@
-error: multiple template placeholders must use parentheses, such as `(Ty, Width)`
- --> tests/ui/bracketed_placeholders.rs:5:13
-  |
-5 |         for [Ty, Width] in [
-  |             ^

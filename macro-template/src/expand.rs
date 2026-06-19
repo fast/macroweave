@@ -18,45 +18,43 @@ use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use syn::Result;
 
-use crate::parse::Replacement;
+use crate::parse::Binding;
 use crate::parse::Template;
 
 pub fn expand(input: TokenStream) -> Result<TokenStream> {
     let Template { rows, template } = syn::parse2::<Template>(input)?;
 
-    let replacements = rows
+    let bindings_by_row = rows
         .iter()
-        .map(|src| src.replacements.as_slice())
+        .map(|row| row.bindings.as_slice())
         .collect::<Vec<_>>();
 
     let mut found_splice = false;
-    let expanded = expand_splice_blocks(&replacements, template.clone(), &mut found_splice);
+    let expanded = expand_splice_blocks(&bindings_by_row, template.clone(), &mut found_splice);
     if found_splice {
         return Ok(expanded);
     }
 
     let mut output = TokenStream::new();
-    for replacement in replacements {
-        output.extend(replace_token_stream(replacement, template.clone()));
+    for bindings in bindings_by_row {
+        output.extend(substitute_tokens(bindings, template.clone()));
     }
     Ok(output)
 }
 
-fn replace_token_stream(replacements: &[Replacement], tokens: TokenStream) -> TokenStream {
+fn substitute_tokens(bindings: &[Binding], tokens: TokenStream) -> TokenStream {
     let mut new_tokens = TokenStream::new();
     for token in tokens {
         match token {
             TokenTree::Group(group) => {
-                let content = replace_token_stream(replacements, group.stream());
+                let content = substitute_tokens(bindings, group.stream());
                 let mut new_group = Group::new(group.delimiter(), content);
                 new_group.set_span(group.span());
                 new_tokens.extend([TokenTree::Group(new_group)]);
             }
             TokenTree::Ident(ident) => {
-                if let Ok(index) =
-                    replacements.binary_search_by(|replacement| replacement.placeholder.cmp(&ident))
-                {
-                    new_tokens.extend(replacements[index].tokens.clone());
+                if let Ok(index) = bindings.binary_search_by(|binding| binding.var.cmp(&ident)) {
+                    new_tokens.extend(bindings[index].tokens.clone());
                 } else {
                     new_tokens.extend([TokenTree::Ident(ident)]);
                 }
@@ -68,7 +66,7 @@ fn replace_token_stream(replacements: &[Replacement], tokens: TokenStream) -> To
 }
 
 fn expand_splice_blocks(
-    replacements_by_row: &[&[Replacement]],
+    bindings_by_row: &[&[Binding]],
     tokens: TokenStream,
     found_splice: &mut bool,
 ) -> TokenStream {
@@ -77,7 +75,7 @@ fn expand_splice_blocks(
     let mut i = 0;
     while i < tokens.len() {
         if let TokenTree::Group(group) = &mut tokens[i] {
-            let content = expand_splice_blocks(replacements_by_row, group.stream(), found_splice);
+            let content = expand_splice_blocks(bindings_by_row, group.stream(), found_splice);
             let mut new_group = Group::new(group.delimiter(), content);
             new_group.set_span(group.span());
             *group = new_group;
@@ -92,8 +90,8 @@ fn expand_splice_blocks(
 
         *found_splice = true;
         let mut repeated = vec![];
-        for row_replacements in replacements_by_row {
-            repeated.extend(replace_token_stream(row_replacements, template.clone()));
+        for row_bindings in bindings_by_row {
+            repeated.extend(substitute_tokens(row_bindings, template.clone()));
         }
 
         let repeated_len = repeated.len();

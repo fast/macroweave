@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! [`template!`] is a procedural macro that generates repeated Rust code in multiple places with
-//! table-driven sources.
+//! table-driven inputs.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
@@ -21,7 +21,7 @@
 mod expand;
 mod parse;
 
-/// Expands an item, block, or statement template from one or more sources.
+/// Expands an item, block, or statement template from one or more input clauses.
 #[proc_macro]
 pub fn template(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     match expand::expand(input.into()) {

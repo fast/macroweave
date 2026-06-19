@@ -65,7 +65,7 @@ fn expands_statement_templates() {
 }
 
 #[test]
-fn accepts_trailing_comma_after_single_source() {
+fn accepts_trailing_comma_after_single_input_clause() {
     template! {
         for N in [1usize, 2usize],
         {
@@ -76,7 +76,7 @@ fn accepts_trailing_comma_after_single_source() {
 
 #[test]
 #[allow(clippy::vec_init_then_push)]
-fn preserves_grouped_commas_in_single_placeholder_rows() {
+fn preserves_grouped_commas_in_single_variable_rows() {
     let mut pairs = vec![];
 
     template! {
@@ -146,7 +146,7 @@ template! {
 }
 
 #[test]
-fn preserves_outer_placeholder_tokens_in_splice_templates() {
+fn preserves_outer_variable_tokens_in_splice_templates() {
     assert_eq!(format!("{:?}", Name::Alpha), "Alpha");
     assert_eq!(format!("{:?}", Name::Beta), "Beta");
 }
@@ -242,7 +242,7 @@ fn treats_fat_arrow_as_plain_row_tokens() {
 }
 
 #[test]
-fn expands_integer_range_source_for_tuple_fields() {
+fn expands_integer_range_input_for_tuple_fields() {
     let tuple = (1usize, 2usize, 3usize);
     let mut sum = 0usize;
 
@@ -257,7 +257,7 @@ fn expands_integer_range_source_for_tuple_fields() {
 
 #[test]
 #[allow(clippy::vec_init_then_push)]
-fn expands_character_range_source() {
+fn expands_character_range_input() {
     let mut chars = vec![];
 
     template! {
@@ -271,7 +271,7 @@ fn expands_character_range_source() {
 
 #[test]
 #[allow(clippy::vec_init_then_push)]
-fn expands_byte_range_source() {
+fn expands_byte_range_input() {
     let mut bytes = Vec::<u8>::new();
 
     template! {
@@ -382,7 +382,7 @@ fn preserves_integer_range_suffix() {
 }
 
 #[test]
-fn expands_empty_range_source_to_no_tokens() {
+fn expands_empty_range_input_to_no_tokens() {
     let total = 0;
 
     template! {
@@ -441,7 +441,7 @@ template! {
 }
 
 #[test]
-fn combines_tuple_rows_and_list_sources() {
+fn combines_tuple_rows_and_list_inputs() {
     assert_eq!(<DatabasesView as SystemView<u8>>::NAME, "Databases");
     assert_eq!(<DatabasesView as SystemView<u16>>::NAME, "Databases");
     assert_eq!(<SchemasView as SystemView<u8>>::NAME, "Schemas");
@@ -468,7 +468,7 @@ template! {
 }
 
 #[test]
-fn combines_tuple_rows_and_range_sources() {
+fn combines_tuple_rows_and_range_inputs() {
     assert_eq!(<Login as MessageCode<1>>::CODE, 0x1001);
     assert_eq!(<Login as MessageCode<2>>::CODE, 0x1002);
     assert_eq!(<Data as MessageCode<1>>::CODE, 0x2001);
