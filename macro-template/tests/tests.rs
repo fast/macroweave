@@ -20,6 +20,12 @@ template! {
     }
 }
 
+template! {
+    for T in [] {
+        const _: &'static str = stringify!(T);
+    }
+}
+
 trait TypeTag {
     const TAG: u8;
 }

@@ -152,11 +152,7 @@ impl Parse for Source {
         let rows = if input.peek(syn::token::Bracket) {
             let source;
             bracketed!(source in input);
-            let rows = parse_source_rows(&source, &placeholders)?;
-            if rows.is_empty() {
-                return Err(source.error("expected at least one template row"));
-            }
-            rows
+            parse_source_rows(&source, &placeholders)?
         } else {
             parse_range_source_rows(input, &placeholders)?
         };
