@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A template library.
+//! [`template!`] is a procedural macro that generates repeated Rust code in multiple places with
+//! table-driven sources.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 
-/// A placeholder function.
-pub fn hello() {
-    println!("Hello, world!");
+/// Expands an item, block, or statement template from one or more sources.
+#[proc_macro]
+pub fn template(_input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    unimplemented!("template macro expansion")
 }

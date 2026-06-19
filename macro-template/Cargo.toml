@@ -13,8 +13,12 @@
 # limitations under the License.
 
 [package]
-name = "template"
+name = "macro-template"
 version = "0.0.1"
+
+categories = ["development-tools::procedural-macro-helpers"]
+description = "Macro to generate repeated Rust code with table-driven sources."
+keywords = ["macro", "template", "codegen"]
 
 edition.workspace = true
 homepage.workspace = true
@@ -23,7 +27,16 @@ readme.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[lib]
+proc-macro = true
+
 [dependencies]
+proc-macro2 = { version = "1.0.106" }
+quote = { version = "1.0.45" }
+syn = { version = "2.0.118" }
+
+[dev-dependencies]
+trybuild = { version = "1.0.116" }
 
 [lints]
 workspace = true
