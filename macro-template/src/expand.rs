@@ -53,7 +53,8 @@ fn substitute_tokens(bindings: &[Binding], tokens: TokenStream) -> TokenStream {
                 new_tokens.extend([TokenTree::Group(new_group)]);
             }
             TokenTree::Ident(ident) => {
-                if let Ok(index) = bindings.binary_search_by(|binding| binding.var.cmp(&ident)) {
+                debug_assert!(bindings.is_sorted_by_key(|b| &b.var));
+                if let Ok(index) = bindings.binary_search_by(|b| b.var.cmp(&ident)) {
                     new_tokens.extend(bindings[index].tokens.clone());
                 } else {
                     new_tokens.extend([TokenTree::Ident(ident)]);
