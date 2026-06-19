@@ -30,6 +30,21 @@ pub fn expand(input: TokenStream) -> Result<TokenStream> {
     syn::parse2::<Template>(input)?.expand()
 }
 
+#[derive(Clone)]
+pub struct Replacement {
+    placeholder: Ident,
+    tokens: TokenStream,
+}
+
+impl Replacement {
+    pub fn new(placeholder: Ident, tokens: TokenStream) -> Self {
+        Self {
+            placeholder,
+            tokens,
+        }
+    }
+}
+
 struct Template {
     sources: Sources,
     template: TokenStream,
@@ -97,21 +112,6 @@ impl Template {
             output.extend(replace_token_stream(template.clone(), replacement));
         }
         Ok(output)
-    }
-}
-
-#[derive(Clone)]
-pub struct Replacement {
-    placeholder: Ident,
-    tokens: TokenStream,
-}
-
-impl Replacement {
-    pub fn new(placeholder: Ident, tokens: TokenStream) -> Self {
-        Self {
-            placeholder,
-            tokens,
-        }
     }
 }
 
