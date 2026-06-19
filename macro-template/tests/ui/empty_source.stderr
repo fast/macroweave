@@ -1,5 +1,0 @@
-error: unexpected end of input, expected at least one template row
- --> tests/ui/empty_source.rs:5:19
-  |
-5 |         for T in [] {
-  |                   ^

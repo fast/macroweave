@@ -1,5 +1,0 @@
-error: range sources require exactly one template placeholder
- --> tests/ui/range_multiple_placeholders.rs:5:14
-  |
-5 |         for (Ty, Max) in 0..=2 {
-  |              ^^

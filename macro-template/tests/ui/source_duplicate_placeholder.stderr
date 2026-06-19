@@ -1,5 +1,0 @@
-error: duplicate source placeholder
- --> tests/ui/source_duplicate_placeholder.rs:6:13
-  |
-6 |         for Ty in [u16] {
-  |             ^^

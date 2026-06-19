@@ -12,8 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[default.extend-words]
-"ser" = "ser" # serialize
+[package]
+name = "examples"
+publish = false
 
-[files]
-extend-exclude = []
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.release]
+release = false
+
+[dependencies]
+macro-template = { workspace = true }
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "template"
+path = "src/template.rs"

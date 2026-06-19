@@ -59,7 +59,7 @@ fn expands_statement_templates() {
 }
 
 #[test]
-fn accepts_trailing_comma_after_single_source() {
+fn accepts_trailing_comma_after_single_input_clause() {
     template! {
         for N in [1usize, 2usize],
         {
@@ -70,8 +70,8 @@ fn accepts_trailing_comma_after_single_source() {
 
 #[test]
 #[allow(clippy::vec_init_then_push)]
-fn preserves_grouped_commas_in_single_placeholder_rows() {
-    let mut pairs = Vec::new();
+fn preserves_grouped_commas_in_single_variable_rows() {
+    let mut pairs = vec![];
 
     template! {
         for Pair in [(1usize, 2usize), (3usize, 4usize)] {
@@ -84,7 +84,7 @@ fn preserves_grouped_commas_in_single_placeholder_rows() {
 
 #[test]
 fn preserves_grouped_commas_in_tuple_row_values() {
-    let mut pairs = Vec::new();
+    let mut pairs = vec![];
 
     template! {
         for (Name, Pair) in [
@@ -129,8 +129,8 @@ fn expands_splice_block_in_item_groups() {
 
 template! {
     for (Name, Variant) in [
-        (SpliceBlockCommonEnum, Alpha),
-        (SpliceBlockCommonEnum, Beta),
+        (IgnoredOne, Alpha),
+        (IgnoredTwo, Beta),
     ] {
         #[derive(Debug, PartialEq, Eq)]
         enum Name {
@@ -140,9 +140,9 @@ template! {
 }
 
 #[test]
-fn replaces_common_placeholder_outside_splice_block() {
-    assert_eq!(format!("{:?}", SpliceBlockCommonEnum::Alpha), "Alpha");
-    assert_eq!(format!("{:?}", SpliceBlockCommonEnum::Beta), "Beta");
+fn preserves_outer_variable_tokens_in_splice_templates() {
+    assert_eq!(format!("{:?}", Name::Alpha), "Alpha");
+    assert_eq!(format!("{:?}", Name::Beta), "Beta");
 }
 
 #[test]
@@ -236,7 +236,7 @@ fn treats_fat_arrow_as_plain_row_tokens() {
 }
 
 #[test]
-fn expands_integer_range_source_for_tuple_fields() {
+fn expands_integer_range_input_for_tuple_fields() {
     let tuple = (1usize, 2usize, 3usize);
     let mut sum = 0usize;
 
@@ -251,8 +251,8 @@ fn expands_integer_range_source_for_tuple_fields() {
 
 #[test]
 #[allow(clippy::vec_init_then_push)]
-fn expands_character_range_source() {
-    let mut chars = Vec::new();
+fn expands_character_range_input() {
+    let mut chars = vec![];
 
     template! {
         for C in 'a'..='c' {
@@ -265,7 +265,7 @@ fn expands_character_range_source() {
 
 #[test]
 #[allow(clippy::vec_init_then_push)]
-fn expands_byte_range_source() {
+fn expands_byte_range_input() {
     let mut bytes = Vec::<u8>::new();
 
     template! {
@@ -279,8 +279,8 @@ fn expands_byte_range_source() {
 
 #[test]
 #[allow(clippy::vec_init_then_push)]
-fn preserves_integer_range_radix_and_padding() {
-    let mut lower_hex = Vec::new();
+fn preserves_integer_range_radix() {
+    let mut lower_hex = vec![];
     template! {
         for N in 0x08..=0x0b {
             lower_hex.push(stringify!(N));
@@ -288,7 +288,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(lower_hex, ["0x08", "0x09", "0x0a", "0x0b"]);
 
-    let mut upper_hex = Vec::new();
+    let mut upper_hex = vec![];
     template! {
         for N in 0x08..=0x0B {
             upper_hex.push(stringify!(N));
@@ -296,7 +296,18 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(upper_hex, ["0x08", "0x09", "0x0A", "0x0B"]);
 
-    let mut binary = Vec::new();
+    let mut upper_hex_prefix = vec![];
+    template! {
+        for N in 0X09..0X10 {
+            upper_hex_prefix.push(stringify!(N));
+        }
+    }
+    assert_eq!(
+        upper_hex_prefix,
+        ["0x09", "0x0A", "0x0B", "0x0C", "0x0D", "0x0E", "0x0F"]
+    );
+
+    let mut binary = vec![];
     template! {
         for N in 0b001..=0b011 {
             binary.push(stringify!(N));
@@ -304,15 +315,19 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(binary, ["0b001", "0b010", "0b011"]);
 
-    let mut octal = Vec::new();
+    let mut octal = vec![];
     template! {
         for N in 0o06..=0o10 {
             octal.push(stringify!(N));
         }
     }
     assert_eq!(octal, ["0o06", "0o07", "0o10"]);
+}
 
-    let mut decimal = Vec::new();
+#[test]
+#[allow(clippy::vec_init_then_push)]
+fn preserves_integer_range_padding() {
+    let mut decimal = vec![];
     template! {
         for N in 098..=100 {
             decimal.push(stringify!(N));
@@ -320,7 +335,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(decimal, ["098", "099", "100"]);
 
-    let mut padded_start = Vec::new();
+    let mut padded_start = vec![];
     template! {
         for N in 00..=03 {
             padded_start.push(stringify!(N));
@@ -328,7 +343,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(padded_start, ["00", "01", "02", "03"]);
 
-    let mut padded_end = Vec::new();
+    let mut padded_end = vec![];
     template! {
         for N in 008..=010 {
             padded_end.push(stringify!(N));
@@ -336,7 +351,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(padded_end, ["008", "009", "010"]);
 
-    let mut padded_hex_start = Vec::new();
+    let mut padded_hex_start = vec![];
     template! {
         for N in 0x0008..=0x000A {
             padded_hex_start.push(stringify!(N));
@@ -344,7 +359,25 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(padded_hex_start, ["0x0008", "0x0009", "0x000A"]);
 
-    let mut one_sided_padding = Vec::new();
+    let mut seq_macro_style_hex_padding = vec![];
+    template! {
+        for N in 0x000..=0x00F {
+            seq_macro_style_hex_padding.push(stringify!(N));
+        }
+    }
+    assert_eq!(
+        seq_macro_style_hex_padding,
+        [
+            "0x000", "0x001", "0x002", "0x003", "0x004", "0x005", "0x006", "0x007", "0x008",
+            "0x009", "0x00A", "0x00B", "0x00C", "0x00D", "0x00E", "0x00F",
+        ]
+    );
+}
+
+#[test]
+#[allow(clippy::vec_init_then_push)]
+fn uses_narrower_padding_width_when_only_one_bound_is_padded() {
+    let mut one_sided_padding = vec![];
     template! {
         for N in 00..=3 {
             one_sided_padding.push(stringify!(N));
@@ -352,7 +385,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(one_sided_padding, ["0", "1", "2", "3"]);
 
-    let mut one_sided_hex_padding = Vec::new();
+    let mut one_sided_hex_padding = vec![];
     template! {
         for N in 0x0008..=0x0A {
             one_sided_hex_padding.push(stringify!(N));
@@ -376,16 +409,21 @@ fn preserves_integer_range_suffix() {
 }
 
 #[test]
-fn expands_empty_range_source_to_no_tokens() {
-    let total = 0;
-
-    template! {
-        for N in 0..0 {
-            total += N;
-        }
+#[allow(clippy::vec_init_then_push)]
+fn accepts_literal_range_bounds_from_macro_rules() {
+    macro_rules! collect_range {
+        ($end:literal) => {{
+            let mut values = Vec::<usize>::new();
+            template! {
+                for N in 0..$end {
+                    values.push(N);
+                }
+            }
+            values
+        }};
     }
 
-    assert_eq!(total, 0);
+    assert_eq!(collect_range!(4usize), [0, 1, 2, 3]);
 }
 
 trait Kernel<T> {
@@ -435,7 +473,7 @@ template! {
 }
 
 #[test]
-fn combines_tuple_rows_and_list_sources() {
+fn combines_tuple_rows_and_list_inputs() {
     assert_eq!(<DatabasesView as SystemView<u8>>::NAME, "Databases");
     assert_eq!(<DatabasesView as SystemView<u16>>::NAME, "Databases");
     assert_eq!(<SchemasView as SystemView<u8>>::NAME, "Schemas");
@@ -462,7 +500,7 @@ template! {
 }
 
 #[test]
-fn combines_tuple_rows_and_range_sources() {
+fn combines_tuple_rows_and_range_inputs() {
     assert_eq!(<Login as MessageCode<1>>::CODE, 0x1001);
     assert_eq!(<Login as MessageCode<2>>::CODE, 0x1002);
     assert_eq!(<Data as MessageCode<1>>::CODE, 0x2001);
@@ -486,7 +524,7 @@ fn expands_splice_block_over_cartesian_rows() {
 #[test]
 #[allow(clippy::vec_init_then_push)]
 fn expands_statement_cartesian_product() {
-    let mut values = Vec::new();
+    let mut values = vec![];
 
     template! {
         for Prefix in ["read", "write"],
