@@ -81,8 +81,8 @@ pub struct Sources {
 
 impl Parse for Sources {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let mut sources = Vec::new();
-        let mut placeholders = Vec::new();
+        let mut sources = vec![];
+        let mut placeholders = vec![];
 
         loop {
             input.parse::<Token![for]>()?;
@@ -154,7 +154,7 @@ struct RangeSource {
 
 impl RangeSource {
     fn values(&self) -> Vec<TokenStream> {
-        let mut values = Vec::new();
+        let mut values = vec![];
         if self.start > self.end || (!self.inclusive && self.start == self.end) {
             return values;
         }
@@ -427,7 +427,7 @@ fn cartesian_product_rows(sources: Vec<Vec<SourceRow>>) -> Vec<SourceRow> {
     let mut rows = vec![SourceRow::empty()];
 
     for source_rows in sources {
-        let mut next_rows = Vec::new();
+        let mut next_rows = vec![];
         for base in &rows {
             for row in &source_rows {
                 next_rows.push(base.merge(row));
@@ -514,7 +514,7 @@ fn parse_source_rows(
     input: ParseStream<'_>,
     placeholders: &Placeholders,
 ) -> Result<Vec<SourceRow>> {
-    let mut rows = Vec::new();
+    let mut rows = vec![];
     while !input.is_empty() {
         rows.push(parse_source_row(input, placeholders)?);
         if input.is_empty() {
@@ -553,7 +553,7 @@ fn parse_source_row(input: ParseStream<'_>, placeholders: &Placeholders) -> Resu
 }
 
 fn parse_row_values(input: ParseStream<'_>) -> Result<Vec<TokenStream>> {
-    let mut values = Vec::new();
+    let mut values = vec![];
     while !input.is_empty() {
         values.push(parse_tokens_until_comma(input)?);
         if input.peek(Token![,]) {
@@ -564,7 +564,7 @@ fn parse_row_values(input: ParseStream<'_>) -> Result<Vec<TokenStream>> {
 }
 
 fn parse_tokens_until_comma(input: ParseStream<'_>) -> Result<TokenStream> {
-    let mut tokens = Vec::new();
+    let mut tokens = vec![];
     while !input.is_empty() {
         if input.peek(Token![,]) {
             break;

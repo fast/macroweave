@@ -71,7 +71,7 @@ fn accepts_trailing_comma_after_single_source() {
 #[test]
 #[allow(clippy::vec_init_then_push)]
 fn preserves_grouped_commas_in_single_placeholder_rows() {
-    let mut pairs = Vec::new();
+    let mut pairs = vec![];
 
     template! {
         for Pair in [(1usize, 2usize), (3usize, 4usize)] {
@@ -84,7 +84,7 @@ fn preserves_grouped_commas_in_single_placeholder_rows() {
 
 #[test]
 fn preserves_grouped_commas_in_tuple_row_values() {
-    let mut pairs = Vec::new();
+    let mut pairs = vec![];
 
     template! {
         for (Name, Pair) in [
@@ -252,7 +252,7 @@ fn expands_integer_range_source_for_tuple_fields() {
 #[test]
 #[allow(clippy::vec_init_then_push)]
 fn expands_character_range_source() {
-    let mut chars = Vec::new();
+    let mut chars = vec![];
 
     template! {
         for C in 'a'..='c' {
@@ -280,7 +280,7 @@ fn expands_byte_range_source() {
 #[test]
 #[allow(clippy::vec_init_then_push)]
 fn preserves_integer_range_radix_and_padding() {
-    let mut lower_hex = Vec::new();
+    let mut lower_hex = vec![];
     template! {
         for N in 0x08..=0x0b {
             lower_hex.push(stringify!(N));
@@ -288,7 +288,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(lower_hex, ["0x08", "0x09", "0x0a", "0x0b"]);
 
-    let mut upper_hex = Vec::new();
+    let mut upper_hex = vec![];
     template! {
         for N in 0x08..=0x0B {
             upper_hex.push(stringify!(N));
@@ -296,7 +296,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(upper_hex, ["0x08", "0x09", "0x0A", "0x0B"]);
 
-    let mut binary = Vec::new();
+    let mut binary = vec![];
     template! {
         for N in 0b001..=0b011 {
             binary.push(stringify!(N));
@@ -304,7 +304,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(binary, ["0b001", "0b010", "0b011"]);
 
-    let mut octal = Vec::new();
+    let mut octal = vec![];
     template! {
         for N in 0o06..=0o10 {
             octal.push(stringify!(N));
@@ -312,7 +312,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(octal, ["0o06", "0o07", "0o10"]);
 
-    let mut decimal = Vec::new();
+    let mut decimal = vec![];
     template! {
         for N in 098..=100 {
             decimal.push(stringify!(N));
@@ -320,7 +320,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(decimal, ["098", "099", "100"]);
 
-    let mut padded_start = Vec::new();
+    let mut padded_start = vec![];
     template! {
         for N in 00..=03 {
             padded_start.push(stringify!(N));
@@ -328,7 +328,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(padded_start, ["00", "01", "02", "03"]);
 
-    let mut padded_end = Vec::new();
+    let mut padded_end = vec![];
     template! {
         for N in 008..=010 {
             padded_end.push(stringify!(N));
@@ -336,7 +336,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(padded_end, ["008", "009", "010"]);
 
-    let mut padded_hex_start = Vec::new();
+    let mut padded_hex_start = vec![];
     template! {
         for N in 0x0008..=0x000A {
             padded_hex_start.push(stringify!(N));
@@ -344,7 +344,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(padded_hex_start, ["0x0008", "0x0009", "0x000A"]);
 
-    let mut one_sided_padding = Vec::new();
+    let mut one_sided_padding = vec![];
     template! {
         for N in 00..=3 {
             one_sided_padding.push(stringify!(N));
@@ -352,7 +352,7 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(one_sided_padding, ["0", "1", "2", "3"]);
 
-    let mut one_sided_hex_padding = Vec::new();
+    let mut one_sided_hex_padding = vec![];
     template! {
         for N in 0x0008..=0x0A {
             one_sided_hex_padding.push(stringify!(N));
@@ -486,7 +486,7 @@ fn expands_splice_block_over_cartesian_rows() {
 #[test]
 #[allow(clippy::vec_init_then_push)]
 fn expands_statement_cartesian_product() {
-    let mut values = Vec::new();
+    let mut values = vec![];
 
     template! {
         for Prefix in ["read", "write"],

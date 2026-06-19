@@ -17,7 +17,6 @@ use proc_macro2::Group;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
-use quote::ToTokens;
 use syn::Result;
 use syn::braced;
 use syn::parse::Parse;
@@ -104,38 +103,40 @@ impl Template {
         } else {
             let mut output = TokenStream::new();
             for replacement in replacements {
-                output.extend(replace_token_stream(template.clone(), replacement));
+                output.extend(replace_token_stream(replacement, template.clone()));
             }
             output
         }
     }
 }
 
-fn replace_token_stream(tokens: TokenStream, replacements: &[Replacement]) -> TokenStream {
-    tokens
-        .into_iter()
-        .flat_map(|token| match token {
-            TokenTree::Ident(ident) => replacements
-                .iter()
-                .find_map(|replacement| {
-                    if ident == replacement.placeholder {
-                        Some(replacement.tokens.clone())
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or_else(|| ident.into_token_stream()),
+fn replace_token_stream(replacements: &[Replacement], tokens: TokenStream) -> TokenStream {
+    let mut new_tokens = TokenStream::new();
+    for token in tokens {
+        match token {
             TokenTree::Group(group) => {
-                let mut new_group = Group::new(
-                    group.delimiter(),
-                    replace_token_stream(group.stream(), replacements),
-                );
+                let content = replace_token_stream(replacements, group.stream());
+                let mut new_group = Group::new(group.delimiter(), content);
                 new_group.set_span(group.span());
-                new_group.into_token_stream()
+                new_tokens.extend([TokenTree::Group(new_group)]);
             }
-            other => other.into(),
-        })
-        .collect()
+            TokenTree::Ident(ident) => {
+                let mut found_replacement = false;
+                for replacement in replacements {
+                    if ident == replacement.placeholder {
+                        new_tokens.extend(replacement.tokens.clone());
+                        found_replacement = true;
+                        break;
+                    }
+                }
+                if !found_replacement {
+                    new_tokens.extend([TokenTree::Ident(ident)]);
+                }
+            }
+            other => new_tokens.extend([other]),
+        }
+    }
+    new_tokens
 }
 
 fn expand_splice_blocks(
@@ -162,9 +163,9 @@ fn expand_splice_blocks(
         };
 
         *found_splice = true;
-        let mut repeated = Vec::new();
+        let mut repeated = vec![];
         for row_replacements in replacements_by_row {
-            repeated.extend(replace_token_stream(template.clone(), row_replacements));
+            repeated.extend(replace_token_stream(row_replacements, template.clone()));
         }
 
         let repeated_len = repeated.len();

@@ -178,7 +178,7 @@ assert_eq!(string, "xyz");
 You can combine multiple iterators in a single template:
 
 ```rust
-let mut values = Vec::new();
+let mut values = vec![];
 
 macro_template::template! {
     for Prefix in ["read", "write"],
