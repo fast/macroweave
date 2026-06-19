@@ -129,8 +129,8 @@ fn expands_splice_block_in_item_groups() {
 
 template! {
     for (Name, Variant) in [
-        (SpliceBlockCommonEnum, Alpha),
-        (SpliceBlockCommonEnum, Beta),
+        (IgnoredOne, Alpha),
+        (IgnoredTwo, Beta),
     ] {
         #[derive(Debug, PartialEq, Eq)]
         enum Name {
@@ -140,9 +140,9 @@ template! {
 }
 
 #[test]
-fn replaces_common_placeholder_outside_splice_block() {
-    assert_eq!(format!("{:?}", SpliceBlockCommonEnum::Alpha), "Alpha");
-    assert_eq!(format!("{:?}", SpliceBlockCommonEnum::Beta), "Beta");
+fn preserves_outer_placeholder_tokens_in_splice_templates() {
+    assert_eq!(format!("{:?}", Name::Alpha), "Alpha");
+    assert_eq!(format!("{:?}", Name::Beta), "Beta");
 }
 
 #[test]

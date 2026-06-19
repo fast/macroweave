@@ -1,5 +1,0 @@
-error: row-varying placeholder must appear inside an `@splice { ... }` block
- --> tests/ui/splice_block_row_varying_outer_placeholder.rs:9:18
-  |
-9 |             enum Name {
-  |                  ^^^^

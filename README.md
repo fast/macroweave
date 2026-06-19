@@ -132,6 +132,10 @@ macro_template::template! {
 }
 ```
 
+When a template contains `@splice`, source placeholders are replaced only inside `@splice { ... }`.
+Surrounding tokens stay literal, even when an identifier has the same name as a source placeholder.
+If a value should vary, place it in the splice block.
+
 Naturally, if the match arm differs left-hand side and right-hand side:
 
 ```rust

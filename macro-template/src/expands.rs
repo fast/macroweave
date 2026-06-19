@@ -18,7 +18,6 @@ use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::ToTokens;
-use syn::Error;
 use syn::Result;
 use syn::braced;
 use syn::parse::Parse;
@@ -88,7 +87,7 @@ impl Parse for Template {
 impl Template {
     fn expand(self) -> Result<TokenStream> {
         let Self {
-            sources: Sources { placeholders, rows },
+            sources: Sources { rows },
             template,
         } = self;
 
@@ -98,13 +97,7 @@ impl Template {
             .collect::<Vec<_>>();
 
         if contains_splice_block(template.clone()) {
-            let common_replacements = common_replacements(&placeholders, &replacements);
-            return expand_splice_blocks(
-                &replacements,
-                &common_replacements,
-                &placeholders,
-                template,
-            );
+            return Ok(expand_splice_blocks(&replacements, template));
         }
 
         let mut output = TokenStream::new();
@@ -142,42 +135,6 @@ fn replace_token_stream(tokens: TokenStream, replacements: &[Replacement]) -> To
         .collect()
 }
 
-fn common_replacements(
-    placeholders: &[Ident],
-    replacements_by_row: &[&[Replacement]],
-) -> Vec<Replacement> {
-    placeholders
-        .iter()
-        .filter_map(|placeholder| common_replacement(placeholder, replacements_by_row))
-        .collect()
-}
-
-fn common_replacement(
-    placeholder: &Ident,
-    replacements_by_row: &[&[Replacement]],
-) -> Option<Replacement> {
-    let mut rows = replacements_by_row.iter();
-    let first = rows
-        .next()?
-        .iter()
-        .find(|replacement| replacement.placeholder == *placeholder)?
-        .clone();
-
-    for row in rows {
-        let replacement = row
-            .iter()
-            .find(|replacement| replacement.placeholder == *placeholder)?;
-
-        let first = first.tokens.to_string();
-        let replacement = replacement.tokens.to_string();
-        if first != replacement {
-            return None;
-        }
-    }
-
-    Some(first)
-}
-
 fn contains_splice_block(tokens: TokenStream) -> bool {
     let mut tokens = tokens.into_iter().peekable();
 
@@ -201,16 +158,14 @@ fn contains_splice_block(tokens: TokenStream) -> bool {
 
 fn expand_splice_blocks(
     replacements_by_row: &[&[Replacement]],
-    common_replacements: &[Replacement],
-    placeholders: &[Ident],
     tokens: TokenStream,
-) -> Result<TokenStream> {
+) -> TokenStream {
     let mut output = TokenStream::new();
     let mut tokens = tokens.into_iter().peekable();
 
     while let Some(token) = tokens.next() {
-        if let TokenTree::Punct(at) = &token {
-            if at.as_char() == '@' {
+        match token {
+            TokenTree::Punct(at) if at.as_char() == '@' => {
                 let mut lookahead = tokens.clone();
                 if let Some(template) = splice_block(&mut lookahead) {
                     tokens = lookahead;
@@ -219,56 +174,21 @@ fn expand_splice_blocks(
                     }
                     continue;
                 }
-            }
-        }
 
-        output.extend(replace_common_token(
-            token,
-            common_replacements,
-            placeholders,
-            replacements_by_row,
-        )?);
+                output.extend(at.into_token_stream());
+            }
+            TokenTree::Group(group) => {
+                let content = expand_splice_blocks(replacements_by_row, group.stream());
+
+                let mut new_group = Group::new(group.delimiter(), content);
+                new_group.set_span(group.span());
+                output.extend(new_group.into_token_stream());
+            }
+            other => output.extend(other.into_token_stream()),
+        }
     }
 
-    Ok(output)
-}
-
-fn replace_common_token(
-    token: TokenTree,
-    common_replacements: &[Replacement],
-    placeholders: &[Ident],
-    replacements_by_row: &[&[Replacement]],
-) -> Result<TokenStream> {
-    match token {
-        TokenTree::Ident(ident) => {
-            if let Some(replacement) = common_replacements
-                .iter()
-                .find(|replacement| ident == replacement.placeholder)
-            {
-                return Ok(replacement.tokens.clone());
-            }
-            if placeholders.contains(&ident) {
-                return Err(Error::new_spanned(
-                    ident,
-                    "row-varying placeholder must appear inside an `@splice { ... }` block",
-                ));
-            }
-            Ok(ident.into_token_stream())
-        }
-        TokenTree::Group(group) => {
-            let content = expand_splice_blocks(
-                replacements_by_row,
-                common_replacements,
-                placeholders,
-                group.stream(),
-            )?;
-
-            let mut new_group = Group::new(group.delimiter(), content);
-            new_group.set_span(group.span());
-            Ok(new_group.into_token_stream())
-        }
-        other => Ok(other.into_token_stream()),
-    }
+    output
 }
 
 fn splice_block(tokens: &mut impl Iterator<Item = TokenTree>) -> Option<TokenStream> {

@@ -76,7 +76,6 @@ impl SourceRow {
 }
 
 pub struct Sources {
-    pub placeholders: Vec<Ident>,
     pub rows: Vec<SourceRow>,
 }
 
@@ -112,7 +111,7 @@ impl Parse for Sources {
             cartesian_product_rows(sources)
         };
 
-        Ok(Self { placeholders, rows })
+        Ok(Self { rows })
     }
 }
 
