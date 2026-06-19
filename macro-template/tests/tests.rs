@@ -279,7 +279,7 @@ fn expands_byte_range_input() {
 
 #[test]
 #[allow(clippy::vec_init_then_push)]
-fn preserves_integer_range_radix_and_padding() {
+fn preserves_integer_range_radix() {
     let mut lower_hex = vec![];
     template! {
         for N in 0x08..=0x0b {
@@ -296,6 +296,17 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(upper_hex, ["0x08", "0x09", "0x0A", "0x0B"]);
 
+    let mut upper_hex_prefix = vec![];
+    template! {
+        for N in 0X09..0X10 {
+            upper_hex_prefix.push(stringify!(N));
+        }
+    }
+    assert_eq!(
+        upper_hex_prefix,
+        ["0x09", "0x0A", "0x0B", "0x0C", "0x0D", "0x0E", "0x0F"]
+    );
+
     let mut binary = vec![];
     template! {
         for N in 0b001..=0b011 {
@@ -311,7 +322,11 @@ fn preserves_integer_range_radix_and_padding() {
         }
     }
     assert_eq!(octal, ["0o06", "0o07", "0o10"]);
+}
 
+#[test]
+#[allow(clippy::vec_init_then_push)]
+fn preserves_integer_range_padding() {
     let mut decimal = vec![];
     template! {
         for N in 098..=100 {
@@ -344,6 +359,24 @@ fn preserves_integer_range_radix_and_padding() {
     }
     assert_eq!(padded_hex_start, ["0x0008", "0x0009", "0x000A"]);
 
+    let mut seq_macro_style_hex_padding = vec![];
+    template! {
+        for N in 0x000..=0x00F {
+            seq_macro_style_hex_padding.push(stringify!(N));
+        }
+    }
+    assert_eq!(
+        seq_macro_style_hex_padding,
+        [
+            "0x000", "0x001", "0x002", "0x003", "0x004", "0x005", "0x006", "0x007", "0x008",
+            "0x009", "0x00A", "0x00B", "0x00C", "0x00D", "0x00E", "0x00F",
+        ]
+    );
+}
+
+#[test]
+#[allow(clippy::vec_init_then_push)]
+fn uses_narrower_padding_width_when_only_one_bound_is_padded() {
     let mut one_sided_padding = vec![];
     template! {
         for N in 00..=3 {
@@ -373,6 +406,24 @@ fn preserves_integer_range_suffix() {
     }
 
     assert_eq!(values, [0, 1, 2]);
+}
+
+#[test]
+#[allow(clippy::vec_init_then_push)]
+fn accepts_literal_range_bounds_from_macro_rules() {
+    macro_rules! collect_range {
+        ($end:literal) => {{
+            let mut values = Vec::<usize>::new();
+            template! {
+                for N in 0..$end {
+                    values.push(N);
+                }
+            }
+            values
+        }};
+    }
+
+    assert_eq!(collect_range!(4usize), [0, 1, 2, 3]);
 }
 
 trait Kernel<T> {
