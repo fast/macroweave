@@ -13,15 +13,15 @@
 # limitations under the License.
 
 [workspace]
-members = ["macro-template", "xtask"]
+members = ["examples", "macro-template", "xtask"]
 resolver = "3"
 
 [workspace.package]
 edition = "2024"
-homepage = "https://github.com/fast/macro-macro-template"
+homepage = "https://github.com/fast/macro-template"
 license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/fast/macro-macro-template"
+repository = "https://github.com/fast/macro-template"
 rust-version = "1.85.0"
 
 [workspace.lints.rust]
@@ -39,3 +39,6 @@ pre-release-commit-message = "chore: release v{{version}}"
 shared-version = true
 sign-tag = true
 tag-name = "v{{version}}"
+
+[workspace.dependencies]
+macro-template = { path = "macro-template" }

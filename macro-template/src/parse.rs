@@ -50,18 +50,19 @@ impl Parse for Template {
             validate_source_placeholders(&source.placeholders, &mut placeholders)?;
             sources.push(source.rows);
 
-            if input.peek(Token![,]) {
-                input.parse::<Token![,]>()?;
-                if input.peek(Token![for]) {
-                    continue;
-                }
-                if input.peek(syn::token::Brace) {
-                    break;
-                } else {
-                    return Err(input.error("expected another source after comma"));
-                }
-            } else {
+            if !input.peek(Token![,]) {
                 break;
+            }
+
+            input.parse::<Token![,]>()?;
+            if input.peek(Token![for]) {
+                continue;
+            }
+
+            if input.peek(syn::token::Brace) {
+                break;
+            } else {
+                return Err(input.error("expected another source after comma"));
             }
         }
 
