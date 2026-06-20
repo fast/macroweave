@@ -22,41 +22,36 @@ macro-template provides `template!`, a procedural macro for generating repeated 
 
 ## Motivation
 
-`macro-template` came out of a ScopeDB cleanup. ScopeDB had [`match-template`](https://github.com/tisonkun/match-template/) for variant/type match arms and [`macro_find_and_replace`](https://github.com/lord-ne/rust-macro-find-and-replace/) for repeating Rust fragments over type lists. While replacing them, I found that I wanted the same thing in both places: write the choices once, name the columns, and use those names in Rust syntax. I did not find one macro that fit that shape without another project-specific DSL.
+`macro-template` resulted from a ScopeDB code refactor. ScopeDB has used [`match-template`](https://github.com/tisonkun/match-template/) for variant/type match arms and [`macro_find_and_replace`](https://github.com/lord-ne/rust-macro-find-and-replace/) for repeating Rust fragments over type lists. While replacing them, I found that I wanted the same thing in both places: write the choices once, name the columns, and use those names in Rust syntax. There was no existing macro fitting that shape.
 
 That is the table-driven case `template!` is built around:
 
 ```rust
-#[derive(Debug, PartialEq, Eq)]
-enum Method {
-    Get,
-    Post,
-    Delete,
+trait ReadLe {
+    fn read_le(input: &[u8]) -> Self;
 }
 
-fn parse_method(text: &str) -> Option<Method> {
-    macro_template::template! {
-        for (Text, Variant) in [
-            ("GET", Get),
-            ("POST", Post),
-            ("DELETE", Delete),
-        ] {
-            match text {
-                #(Text => Some(Method::Variant)),*,
-                _ => None,
+macro_template::template! {
+    for (Ty, Width) in [
+        (u16, 2),
+        (u32, 4),
+        (u64, 8),
+    ] {
+        impl ReadLe for Ty {
+            fn read_le(input: &[u8]) -> Self {
+                Ty::from_le_bytes(input[..Width].try_into().unwrap())
             }
         }
     }
 }
 
-assert_eq!(parse_method("POST"), Some(Method::Post));
+assert_eq!(u16::read_le(&[0x34, 0x12]), 0x1234);
+assert_eq!(u32::read_le(&[1, 0, 0, 0]), 1);
 ```
 
-When looking for existing approaches, I also found [`seq-macro`](https://github.com/dtolnay/seq-macro), which covers a neighboring repetition pattern: range-driven generation, where `N` becomes literal tokens like `0`, `1`, and `2`. `template!` keeps both forms under one syntax: table rows, ranges, `#( ... )*` for partial repetition, and multiple `for` clauses for Cartesian products. The examples below expand each case.
+When looking for existing approaches, I also found [`seq-macro`](https://github.com/dtolnay/seq-macro), which covers a neighboring repetition pattern: range-driven generation, where `N in 0..=2` becomes literal tokens like `0`, `1`, and `2`. `template!` keeps both forms under one syntax: table rows, ranges, `#( ... )*` for partial repetition, and multiple `for` clauses for Cartesian products. The examples below expand each case.
 
 ## Examples
-
-The examples below cover whole-body repetition, partial repetition, ranges, and multidimensional inputs.
 
 ### Whole-body repetition
 
@@ -125,19 +120,26 @@ macro_template::template! {
 }
 
 assert_eq!(sum, 1110);
+```
 
-let mut chars = String::new();
+This cannot be written using an ordinary for-loop because elements of a tuple can only be accessed by their integer literal index, not by a variable.
 
+Integer ranges preserve the radix, suffix, and shared padding width from their bounds. You can combine this crate with [`paste`](https://docs.rs/paste/) for identifier generation:
+
+```rust
 macro_template::template! {
-    for C in 'x'..='z' {
-        chars.push(C);
+    for N in 000..=002 {
+        paste::paste! {
+            #[derive(Debug, PartialEq, Eq)]
+            enum Demo {
+                #( [<Variant N>], )*
+            }
+        }
     }
 }
 
-assert_eq!(chars, "xyz");
+assert_eq!(format!("{:?}", Demo::Variant001), "Variant001");
 ```
-
-Integer ranges preserve the radix, suffix, and shared padding width from their bounds.
 
 ### Cartesian products
 

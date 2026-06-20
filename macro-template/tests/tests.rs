@@ -579,6 +579,37 @@ fn expands_splice_over_cartesian_rows() {
 }
 
 #[test]
+fn works_with_paste_for_range_ident_pasting() {
+    template! {
+        for N in 64..=66 {
+            paste::paste! {
+                #[derive(Debug, PartialEq, Eq)]
+                enum Demo {
+                    #( [<Variant N>], )*
+                }
+            }
+        }
+    }
+
+    assert_eq!(format!("{:?}", Demo::Variant64), "Variant64");
+    assert_eq!(format!("{:?}", Demo::Variant65), "Variant65");
+    assert_eq!(format!("{:?}", Demo::Variant66), "Variant66");
+}
+
+#[test]
+fn works_with_paste_for_padded_decimal_ident_pasting() {
+    template! {
+        for P in 000..=002 {
+            paste::paste! {
+                #( struct [<Pin P>]; )*
+            }
+        }
+    }
+
+    let _ = (Pin000, Pin001, Pin002);
+}
+
+#[test]
 #[allow(clippy::vec_init_then_push)]
 fn expands_statement_cartesian_product() {
     let mut values = vec![];
