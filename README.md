@@ -76,27 +76,7 @@ macro_template::template! {
 
 ## Examples
 
-Firstly, the following code generates `From` implementations for `MyEnum` from all its variants:
-
-```rust
-enum MyEnum {
-    A(MyStructA),
-    B(MyStructB),
-    C(MyStructC),
-}
-
-macro_template::template! {
-    for (Variant, Type) in [(A, MyStructA), (B, MyStructB), (C, MyStructC)] {
-        impl From<Type> for MyEnum {
-            fn from(value: Type) -> Self {
-                MyEnum::Variant(value)
-            }
-        }
-    }
-}
-```
-
-You can iterate over a matrix as well:
+Firstly, you can generate code with a template and a matrix of values:
 
 ```rust
 macro_template::template! {
@@ -119,7 +99,7 @@ macro_template::template! {
 }
 ```
 
-Or, you can generate repeated match arms by pattern:
+Or, you can do substitutions only partially with `@splice`. For example, to generate match arms:
 
 ```rust
 macro_template::template! {
