@@ -16,9 +16,11 @@
 [actions-badge]: https://github.com/fast/macro-template/workflows/CI/badge.svg
 [actions-url]: https://github.com/fast/macro-template/actions?query=workflow%3ACI
 
+<!-- macro-template-docs-start -->
+
 macro-template is a procedural macro that generates repeated Rust code in multiple places with table-driven inputs.
 
-## Motivations
+## Motivation
 
 This crate is inspired by [`match-template`](https://github.com/tisonkun/match-template/) and [`macro_find_and_replace`](https://github.com/lord-ne/rust-macro-find-and-replace).
 
@@ -26,9 +28,9 @@ When developing ScopeDB, we introduced these two proc-macros to generate repeate
 
 Last but not least, I found [`seq-macro`](https://github.com/dtolnay/seq-macro) and borrowed some ideas from it, such as iterating over a range of numbers, characters, or bytes, and using a syntax `@splice { }` (equivalent to `seq-macro`'s or `quote`'s `#( ... )*`) to generate partial repeated substitutions. This eliminates the need for an extra `template_match!` to handle repetitions in match arms, and allows for more flexible code generation.
 
-Go back to the beginning, why do you need `macro_template:template!` at all? Isn't it the same as a simple `macro_rules!`?
+Go back to the beginning, why do you need `macro_template::template!` at all? Isn't it the same as a simple `macro_rules!`?
 
-```rust
+```rust,ignore
 macro_rules! impl_serialize {
     ($($ty:ty),* $(,)?) => {
         $(
@@ -51,11 +53,11 @@ macro_rules! impl_serialize {
 impl_serialize!(u8, u16, u32, u64, usize);
 ```
 
-Except that `macro_template:template!` supports more flexible substitution patterns as shown in the [Examples](#examples) section, `template!` has a concise syntax, and it saves you from declaring an extra `macro_rules!` (Naming It!) and invoking it.
+Except that `macro_template::template!` supports more flexible substitution patterns as shown in the [Examples](#examples) section, `template!` has a concise syntax, and it saves you from declaring an extra `macro_rules!`, naming it, and invoking it.
 
 The example above can be rewritten as:
 
-```rust
+```rust,ignore
 macro_template::template! {
     for Ty in [u8, u16, u32, u64, usize] {
         impl serde_core::Serialize for BSize<Ty> {
@@ -76,9 +78,9 @@ macro_template::template! {
 
 ## Examples
 
-Firstly, you can generate code with a template and a matrix of values:
+First, you can generate code with a template and a matrix of values:
 
-```rust
+```rust,ignore
 macro_template::template! {
     for (Endian, Method) in [
         (LittleEndian, to_le_bytes),
@@ -99,9 +101,9 @@ macro_template::template! {
 }
 ```
 
-Or, you can do substitutions only partially with `@splice`. For example, to generate match arms:
+Without `@splice`, the whole template body is repeated once for each row. You can also do substitutions only partially with `@splice`. For example, to generate match arms:
 
-```rust
+```rust,ignore
 macro_template::template! {
     for T in [Int, Real, Double] {
         match Foo {
@@ -112,11 +114,11 @@ macro_template::template! {
 }
 ```
 
-When a template contains `@splice`, template variables are substituted only inside `@splice { ... }`. Surrounding tokens stay literal, even when an identifier has the same name as a template variable. If a value should vary, place it in the splice block.
+When a template contains `@splice`, template variables are substituted only inside `@splice { ... }`, and surrounding tokens are emitted once. Surrounding identifiers stay literal, even when they have the same name as a template variable. If a value should vary, place it in the splice block.
 
 Naturally, if the match arm differs left-hand side and right-hand side:
 
-```rust
+```rust,ignore
 macro_template::template! {
     for (K, Value) in [
         (Apple, "apple"),
@@ -130,14 +132,14 @@ macro_template::template! {
 }
 ```
 
-The iterator can be a sequence of numbers, characters, or bytes:
+Inputs can also be ranges of numbers, characters, or bytes. Range inputs are written directly after `in`, without surrounding brackets:
 
 ```rust
 // sequential numeric counter
 let tuple = (1000, 100, 10);
 let mut sum = 0;
 macro_template::template! {
-    for i in [0..3] {
+    for i in 0..3 {
         sum += tuple.i;
     }
 }
@@ -146,12 +148,14 @@ assert_eq!(sum, 1110);
 // sequential character collector
 let mut string = String::new();
 macro_template::template! {
-    for c in ['x'..='z'] {
+    for c in 'x'..='z' {
         string.push(c);
     }
 }
 assert_eq!(string, "xyz");
 ```
+
+Integer ranges preserve the radix, suffix, and shared padding width from their bounds.
 
 You can combine multiple iterators in a single template:
 
@@ -170,6 +174,10 @@ assert_eq!(
     [("read", 200), ("read", 201), ("write", 200), ("write", 201)],
 );
 ```
+
+Multiple input clauses form a Cartesian product in clause order.
+
+<!-- macro-template-docs-end -->
 
 ## Minimum Rust version policy
 

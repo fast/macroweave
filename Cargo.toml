@@ -13,7 +13,7 @@
 # limitations under the License.
 
 [workspace]
-members = ["examples", "macro-template", "xtask"]
+members = ["macro-template", "xtask"]
 resolver = "3"
 
 [workspace.package]
