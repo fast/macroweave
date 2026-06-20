@@ -83,6 +83,20 @@ fn preserves_grouped_commas_in_single_variable_rows() {
 }
 
 #[test]
+#[allow(clippy::vec_init_then_push)]
+fn accepts_parenthesized_single_variable_rows() {
+    let mut values = vec![];
+
+    template! {
+        for Value in [(first), (second)] {
+            values.push(stringify!(Value));
+        }
+    }
+
+    assert_eq!(values, ["(first)", "(second)"]);
+}
+
+#[test]
 fn preserves_grouped_commas_in_tuple_row_values() {
     let mut pairs = vec![];
 

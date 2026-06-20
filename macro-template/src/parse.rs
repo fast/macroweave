@@ -404,27 +404,21 @@ fn parse_rows(input: ParseStream<'_>, vars: &Vars) -> Result<Table> {
 }
 
 fn parse_row(input: ParseStream<'_>, vars: &Vars) -> Result<Vec<TokenStream>> {
-    if vars.len() > 1 {
-        if !input.peek(syn::token::Paren) {
-            return Err(input.error(
-                "rows for multiple template variables must use parentheses, such as `(u16, 2)`",
-            ));
-        }
+    debug_assert!(vars.len() > 0);
 
-        let row;
-        parenthesized!(row in input);
-        return parse_cells(&row);
+    if vars.len() == 1 {
+        return Ok(vec![parse_cell(input)?]);
     }
 
-    let value = parse_cell(input)?;
-
-    match vars.len() {
-        1 => Ok(vec![value]),
-        _ => Err(Error::new_spanned(
-            vars,
-            "plain rows require exactly one template variable",
-        )),
+    if !input.peek(syn::token::Paren) {
+        return Err(input.error(
+            "rows for multiple template variables must use parentheses, such as `(u16, 2)`",
+        ));
     }
+
+    let row;
+    parenthesized!(row in input);
+    parse_cells(&row)
 }
 
 fn parse_cells(input: ParseStream<'_>) -> Result<Vec<TokenStream>> {
