@@ -69,7 +69,10 @@ impl Parse for Template {
             }
         }
 
-        let table = table_join(clauses);
+        let table = clauses
+            .into_iter()
+            .reduce(|acc, clause| acc.join(clause))
+            .expect("template must have at least one input clause");
 
         let template;
         braced!(template in input);
@@ -250,18 +253,6 @@ impl Parse for ForClause {
     }
 }
 
-fn table_join(clauses: Vec<Table>) -> Table {
-    let mut clauses = clauses.into_iter();
-    let mut table = clauses
-        .next()
-        .expect("template should have at least one input clause");
-
-    for clause in clauses {
-        table = table.join(clause);
-    }
-
-    table
-}
 #[derive(Default)]
 struct Vars {
     idents: Vec<Ident>,
