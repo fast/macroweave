@@ -40,11 +40,11 @@ impl Command {
 
 #[derive(Subcommand)]
 enum SubCommand {
-    #[clap(about = "Compile workspace packages.")]
+    #[clap(about = "Compile all workspace targets.")]
     Build(CommandBuild),
-    #[clap(about = "Run format and clippy checks.")]
+    #[clap(about = "Run workspace quality checks.")]
     Lint(CommandLint),
-    #[clap(about = "Run unit tests.")]
+    #[clap(about = "Run workspace unit tests.")]
     Test(CommandTest),
 }
 
@@ -75,7 +75,7 @@ impl CommandTest {
 #[derive(Parser)]
 #[clap(name = "lint")]
 struct CommandLint {
-    #[arg(long, help = "Automatically apply lint suggestions.")]
+    #[arg(long, help = "Automatically apply available lint and format fixes.")]
     fix: bool,
 }
 
