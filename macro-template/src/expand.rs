@@ -87,8 +87,8 @@ fn expand_splice_blocks(
 
         *found_splice = true;
         let mut repeated = vec![];
-        for row_bindings in table.rows() {
-            repeated.extend(substitute_tokens(row_bindings, template.clone()));
+        for bindings in table.rows() {
+            repeated.extend(substitute_tokens(bindings, template.clone()));
         }
 
         let repeated_len = repeated.len();
