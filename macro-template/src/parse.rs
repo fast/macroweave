@@ -380,17 +380,17 @@ fn parse_range_rows(input: ParseStream<'_>, vars: &Vars) -> Result<Table> {
 }
 
 fn parse_rows(input: ParseStream<'_>, vars: &Vars) -> Result<Table> {
-    let row_values;
-    let bracket_token = bracketed!(row_values in input);
+    let rows;
+    let bracket_token = bracketed!(rows in input);
 
     let mut table = Table::empty(vars.len());
-    while !row_values.is_empty() {
-        let values = parse_row(&row_values, vars)?;
+    while !rows.is_empty() {
+        let values = parse_row(&rows, vars)?;
         table.add_row(vars, values)?;
-        if row_values.is_empty() {
+        if rows.is_empty() {
             break;
         }
-        row_values.parse::<Token![,]>()?;
+        rows.parse::<Token![,]>()?;
     }
 
     if table.is_empty() {
@@ -413,17 +413,10 @@ fn parse_row(input: ParseStream<'_>, vars: &Vars) -> Result<Vec<TokenStream>> {
 
         let row;
         parenthesized!(row in input);
-        let mut values = vec![];
-        while !row.is_empty() {
-            values.push(parse_tokens_until_comma(&row)?);
-            if row.peek(Token![,]) {
-                row.parse::<Token![,]>()?;
-            }
-        }
-        return Ok(values);
+        return parse_cells(&row);
     }
 
-    let value = parse_tokens_until_comma(input)?;
+    let value = parse_cell(input)?;
 
     match vars.len() {
         1 => Ok(vec![value]),
@@ -434,7 +427,19 @@ fn parse_row(input: ParseStream<'_>, vars: &Vars) -> Result<Vec<TokenStream>> {
     }
 }
 
-fn parse_tokens_until_comma(input: ParseStream<'_>) -> Result<TokenStream> {
+fn parse_cells(input: ParseStream<'_>) -> Result<Vec<TokenStream>> {
+    let mut cells = vec![];
+    while !input.is_empty() {
+        cells.push(parse_cell(input)?);
+        if input.is_empty() {
+            break;
+        }
+        input.parse::<Token![,]>()?;
+    }
+    Ok(cells)
+}
+
+fn parse_cell(input: ParseStream<'_>) -> Result<TokenStream> {
     let mut tokens = vec![];
     while !input.is_empty() {
         if input.peek(Token![,]) {
