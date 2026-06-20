@@ -35,7 +35,7 @@ pub struct Binding {
 }
 
 pub struct Template {
-    pub rows: Vec<Row>,
+    pub table: Table,
     pub template: TokenStream,
 }
 
@@ -48,7 +48,7 @@ impl Parse for Template {
             input.parse::<Token![for]>()?;
             let clause = input.parse::<ForClause>()?;
             validate_clause_vars(&clause.vars, &mut vars)?;
-            clauses.push(clause.rows);
+            clauses.push(clause.table);
 
             if !input.peek(Token![,]) {
                 break;
@@ -66,11 +66,7 @@ impl Parse for Template {
             }
         }
 
-        let rows = if clauses.len() == 1 {
-            clauses.pop().unwrap()
-        } else {
-            cartesian_product_rows(clauses)
-        };
+        let table = table_join(clauses);
 
         let template;
         braced!(template in input);
@@ -79,38 +75,58 @@ impl Parse for Template {
         if !input.is_empty() {
             return Err(input.error("unexpected tokens after template body"));
         }
-        Ok(Self { rows, template })
+        Ok(Self { table, template })
     }
 }
 
-pub struct Row {
-    pub bindings: Vec<Binding>,
+pub struct Table {
+    bindings: Vec<Binding>,
+    row_count: usize,
+    column_count: usize,
 }
 
-impl Row {
-    fn empty() -> Self {
-        Self { bindings: vec![] }
-    }
+pub struct RowsIter<'a> {
+    table: &'a Table,
+    row: usize,
+}
 
-    fn single(var: &Ident, value: TokenStream) -> Self {
+impl Table {
+    fn empty(column_count: usize) -> Self {
         Self {
-            bindings: vec![Binding {
-                var: var.clone(),
-                tokens: value,
-            }],
+            bindings: vec![],
+            row_count: 0,
+            column_count,
         }
     }
 
-    fn merge(&self, other: &Self) -> Self {
-        let mut bindings = self.bindings.clone();
-        bindings.extend(other.bindings.iter().cloned());
-        bindings.sort_by(|left, right| left.var.cmp(&right.var));
-
-        Self { bindings }
+    fn is_empty(&self) -> bool {
+        self.row_count == 0
     }
 
-    fn zip_vars(vars: &TemplateVars, values: Vec<TokenStream>) -> Result<Self> {
-        let expected = vars.len();
+    pub fn rows(&self) -> RowsIter<'_> {
+        self.assert_invariant();
+
+        RowsIter {
+            table: self,
+            row: 0,
+        }
+    }
+
+    fn add_single_row(&mut self, var: &Ident, value: TokenStream) {
+        debug_assert_eq!(self.column_count, 1);
+
+        self.bindings.push(Binding {
+            var: var.clone(),
+            tokens: value,
+        });
+        self.row_count += 1;
+        self.assert_invariant();
+    }
+
+    fn add_row(&mut self, vars: &TemplateVars, values: Vec<TokenStream>) -> Result<()> {
+        debug_assert_eq!(self.column_count, vars.len());
+
+        let expected = self.column_count;
         let found = values.len();
         if expected != found {
             let mut error = Error::new_spanned(
@@ -133,22 +149,77 @@ impl Row {
             return Err(error);
         }
 
-        let mut bindings = vars
-            .idents
-            .iter()
-            .cloned()
-            .zip(values)
-            .map(|(var, value)| Binding { var, tokens: value })
-            .collect::<Vec<_>>();
-        bindings.sort_by(|left, right| left.var.cmp(&right.var));
+        let row_start = self.bindings.len();
+        self.bindings.extend(
+            vars.idents
+                .iter()
+                .cloned()
+                .zip(values)
+                .map(|(var, value)| Binding { var, tokens: value }),
+        );
+        self.bindings[row_start..].sort_by(|left, right| left.var.cmp(&right.var));
+        self.row_count += 1;
+        self.assert_invariant();
 
-        Ok(Self { bindings })
+        Ok(())
+    }
+
+    fn join(&self, other: &Self) -> Self {
+        self.assert_invariant();
+        other.assert_invariant();
+
+        let column_count = self.column_count + other.column_count;
+        let row_count = self.row_count * other.row_count;
+        let mut bindings = Vec::with_capacity(row_count * column_count);
+
+        for left in self.rows() {
+            for right in other.rows() {
+                let row_start = bindings.len();
+                bindings.extend(left.iter().cloned());
+                bindings.extend(right.iter().cloned());
+                bindings[row_start..].sort_by(|left, right| left.var.cmp(&right.var));
+            }
+        }
+
+        let table = Self {
+            bindings,
+            row_count,
+            column_count,
+        };
+        table.assert_invariant();
+        table
+    }
+
+    fn row(&self, row: usize) -> &[Binding] {
+        debug_assert!(row < self.row_count);
+
+        let start = row * self.column_count;
+        let end = start + self.column_count;
+        &self.bindings[start..end]
+    }
+
+    fn assert_invariant(&self) {
+        debug_assert_eq!(self.bindings.len(), self.row_count * self.column_count);
+    }
+}
+
+impl<'a> Iterator for RowsIter<'a> {
+    type Item = &'a [Binding];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.row == self.table.row_count {
+            return None;
+        }
+
+        let row = self.table.row(self.row);
+        self.row += 1;
+        Some(row)
     }
 }
 
 struct ForClause {
     vars: Vec<Ident>,
-    rows: Vec<Row>,
+    table: Table,
 }
 
 impl Parse for ForClause {
@@ -157,24 +228,24 @@ impl Parse for ForClause {
         let var_idents = vars.idents.clone();
         input.parse::<Token![in]>()?;
 
-        let rows = if input.peek(syn::token::Bracket) {
+        let table = if input.peek(syn::token::Bracket) {
             let row_values;
             let bracket_token = bracketed!(row_values in input);
-            let rows = parse_rows(&row_values, &vars)?;
-            if rows.is_empty() {
+            let table = parse_rows(&row_values, &vars)?;
+            if table.is_empty() {
                 return Err(Error::new(
                     bracket_token.span.join(),
                     "input list must contain at least one row",
                 ));
             }
-            rows
+            table
         } else {
             parse_range_rows(input, &vars)?
         };
 
         Ok(Self {
             vars: var_idents,
-            rows,
+            table,
         })
     }
 }
@@ -202,20 +273,17 @@ fn validate_clause_vars(new_vars: &[Ident], existing_vars: &mut Vec<Ident>) -> R
     Ok(())
 }
 
-fn cartesian_product_rows(clauses: Vec<Vec<Row>>) -> Vec<Row> {
-    let mut rows = vec![Row::empty()];
+fn table_join(clauses: Vec<Table>) -> Table {
+    let mut clauses = clauses.into_iter();
+    let mut table = clauses
+        .next()
+        .expect("template should have at least one input clause");
 
-    for clause_rows in clauses {
-        let mut next_rows = vec![];
-        for base in &rows {
-            for row in &clause_rows {
-                next_rows.push(base.merge(row));
-            }
-        }
-        rows = next_rows;
+    for clause in clauses {
+        table = table.join(&clause);
     }
 
-    rows
+    table
 }
 struct TemplateVars {
     idents: Vec<Ident>,
@@ -290,7 +358,7 @@ fn parse_var_list(input: ParseStream<'_>) -> Result<Vec<Ident>> {
     Ok(idents.into_iter().collect())
 }
 
-fn parse_range_rows(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Vec<Row>> {
+fn parse_range_rows(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Table> {
     if vars.len() != 1 {
         return Err(Error::new_spanned(
             &vars.idents[0],
@@ -308,25 +376,27 @@ fn parse_range_rows(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Vec<R
         ));
     }
 
-    values
-        .into_iter()
-        .map(|value| Ok(Row::single(var, value)))
-        .collect()
+    let mut table = Table::empty(vars.len());
+    for value in values {
+        table.add_single_row(var, value);
+    }
+    Ok(table)
 }
 
-fn parse_rows(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Vec<Row>> {
-    let mut rows = vec![];
+fn parse_rows(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Table> {
+    let mut table = Table::empty(vars.len());
     while !input.is_empty() {
-        rows.push(parse_row(input, vars)?);
+        let values = parse_row(input, vars)?;
+        table.add_row(vars, values)?;
         if input.is_empty() {
             break;
         }
         input.parse::<Token![,]>()?;
     }
-    Ok(rows)
+    Ok(table)
 }
 
-fn parse_row(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Row> {
+fn parse_row(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Vec<TokenStream>> {
     if vars.len() > 1 {
         if !input.peek(syn::token::Paren) {
             return Err(input.error(
@@ -340,13 +410,13 @@ fn parse_row(input: ParseStream<'_>, vars: &TemplateVars) -> Result<Row> {
         if !row.is_empty() {
             return Err(row.error("unexpected tokens in row"));
         }
-        return Row::zip_vars(vars, values);
+        return Ok(values);
     }
 
     let value = parse_tokens_until_comma(input)?;
 
     match vars.len() {
-        1 => Ok(Row::single(&vars.idents[0], value)),
+        1 => Ok(vec![value]),
         _ => Err(Error::new_spanned(
             &vars.idents[0],
             "plain rows require exactly one template variable",
