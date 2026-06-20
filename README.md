@@ -22,11 +22,37 @@ macro-template provides `template!`, a procedural macro for generating repeated 
 
 ## Motivation
 
-`macro-template` came out of a ScopeDB code refactor where two procedural macros were doing almost the same job from different repetition patterns: [`match-template`](https://github.com/tisonkun/match-template/) generated match arms from variant/type mappings, while [`macro_find_and_replace`](https://github.com/lord-ne/rust-macro-find-and-replace/) repeated a Rust fragment after replacing one token with each type in a list.
+`macro-template` came out of a ScopeDB cleanup. ScopeDB had [`match-template`](https://github.com/tisonkun/match-template/) for variant/type match arms and [`macro_find_and_replace`](https://github.com/lord-ne/rust-macro-find-and-replace/) for repeating Rust fragments over type lists. While replacing them, I found that I wanted the same thing in both places: write the choices once, name the columns, and use those names in Rust syntax. I did not find one macro that fit that shape without another project-specific DSL.
 
-The common shape was simpler than either macro's DSL: write down a small table, bind one or more identifiers to each row, and expand ordinary Rust tokens with those bindings. Later, [`seq-macro`](https://github.com/dtolnay/seq-macro) made the same pattern visible for ranges: bind an identifier to each number, byte, or character, then expand a fragment, with `#( ... )*` for the part that repeats inside a surrounding item.
+That is the table-driven case `template!` is built around:
 
-`template!` is that model directly: `for (Variant, Ty) in [...] { ... }`, optional `#( ... )*` when only part of the body repeats, and multiple `for` clauses when a matrix of combinations is what you need. The point is not another clever mini-language; it is a table-driven form that still reads like the Rust it generates.
+```rust
+#[derive(Debug, PartialEq, Eq)]
+enum Method {
+    Get,
+    Post,
+    Delete,
+}
+
+fn parse_method(text: &str) -> Option<Method> {
+    macro_template::template! {
+        for (Text, Variant) in [
+            ("GET", Get),
+            ("POST", Post),
+            ("DELETE", Delete),
+        ] {
+            match text {
+                #(Text => Some(Method::Variant)),*,
+                _ => None,
+            }
+        }
+    }
+}
+
+assert_eq!(parse_method("POST"), Some(Method::Post));
+```
+
+When looking for existing approaches, I also found [`seq-macro`](https://github.com/dtolnay/seq-macro), which covers a neighboring repetition pattern: range-driven generation, where `N` becomes literal tokens like `0`, `1`, and `2`. `template!` keeps both forms under one syntax: table rows, ranges, `#( ... )*` for partial repetition, and multiple `for` clauses for Cartesian products. The examples below expand each case.
 
 ## Examples
 
