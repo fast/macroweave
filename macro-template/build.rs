@@ -20,8 +20,15 @@ const DOCS_START: &str = "<!-- macro-template-docs-start -->";
 const DOCS_END: &str = "<!-- macro-template-docs-end -->";
 
 fn main() {
-    let workspace_dir = PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
-    let readme = workspace_dir.join("README.md");
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let readme = manifest_dir.join("README.md");
+    let readme = if readme.exists() {
+        readme
+    } else {
+        // in the development environment
+        let workspace_dir = PathBuf::from(env::var_os("CARGO_WORKSPACE_DIR").unwrap());
+        workspace_dir.join("README.md")
+    };
     println!("cargo:rerun-if-changed={}", readme.display());
 
     let readme = fs::read_to_string(readme).unwrap();
