@@ -22,58 +22,11 @@ macro-template provides `template!`, a procedural macro for generating repeated 
 
 ## Motivation
 
-While working on ScopeDB, I replaced two procedural macros with this crate: [`match-template`](https://github.com/tisonkun/match-template/), which ScopeDB used to generate match arms over rowset concrete types and system-view variants, and [`macro_find_and_replace`](https://github.com/lord-ne/rust-macro-find-and-replace/), which it used for wrappers such as `with_types!` and `with_system_views!` that repeated a block after replacing one identifier with each type in a list.
+`macro-template` came out of a ScopeDB cleanup where two procedural macros were doing almost the same job from different angles: [`match-template`](https://github.com/tisonkun/match-template/) generated match arms from variant/type mappings, while [`macro_find_and_replace`](https://github.com/lord-ne/rust-macro-find-and-replace/) repeated a Rust fragment after replacing one token with each type in a list.
 
-That migration is the motivating case for `macro-template`. The two old macros looked unrelated at the call site: `match-template` had an assignment-like map syntax such as `T = [...]` or `(Variant, View) = [A => B]`, while `macro_find_and_replace` used positional arguments around the token to replace. But the code I wanted to write had the same shape in both places: bind one or more identifiers to a row of tokens, then expand ordinary Rust tokens with those bindings.
+The common shape was simpler than either macro's DSL: write down a small table, bind one or more identifiers to each row, and expand ordinary Rust tokens with those bindings. Later, [`seq-macro`](https://github.com/dtolnay/seq-macro) made the same pattern visible for ranges: bind an identifier to each number, byte, or character, then expand a fragment, with `#( ... )*` for the part that repeats inside a surrounding item.
 
-ScopeDB's system views make the shape visible. The useful data is just a table such as `(Databases, DatabasesView)` and `(Schemas, SchemasView)`; the generated code may use one column as an enum variant and the other as a type:
-
-```rust
-struct DatabasesView;
-struct SchemasView;
-
-impl DatabasesView {
-    const TABLE_NAME: &'static str = "databases";
-}
-
-impl SchemasView {
-    const TABLE_NAME: &'static str = "schemas";
-}
-
-enum SystemView {
-    Databases(DatabasesView),
-    Schemas(SchemasView),
-}
-
-fn system_view(table_name: &str) -> Option<SystemView> {
-    macro_template::template! {
-        for (Variant, View) in [
-            (Databases, DatabasesView),
-            (Schemas, SchemasView),
-        ] {
-            match table_name {
-                #(View::TABLE_NAME => Some(SystemView::Variant(View)),)*
-                _ => None,
-            }
-        }
-    }
-}
-
-assert!(matches!(system_view("schemas"), Some(SystemView::Schemas(_))));
-```
-
-The problem was not that those crates were bad; it was that every crate had a different mini-language. Reading a call site meant remembering which token was the placeholder, whether `=>` described two substitutions or a match arm, where commas belonged to the macro input, and which part of the Rust body was actually repeated.
-
-I later noticed the same idea in [`seq-macro`](https://github.com/dtolnay/seq-macro): bind an identifier to each number, byte, or character in a range, then expand a Rust fragment, with `#( ... )*` marking the part that repeats inside a surrounding item. That made the common model clearer: this is table-driven token substitution, not a match-specific or sequence-specific trick.
-
-`template!` uses one syntax for these cases:
-
-1. declare one or more template identifiers after `for`;
-2. provide rows with `in [...]` or a range with `in 0..N`;
-3. write the Rust tokens to generate in the block;
-4. add more `for` clauses when independent dimensions should form a Cartesian product.
-
-The goal is not to invent another domain-specific language, but to make the table-driven shape explicit and keep the template body looking like the Rust it will generate.
+`template!` is that model directly: `for (Variant, Ty) in [...] { ... }`, optional `#( ... )*` when only part of the body repeats, and multiple `for` clauses when a matrix of combinations is what you need. The point is not another clever mini-language; it is a table-driven form that still reads like the Rust it generates.
 
 ## Examples
 
