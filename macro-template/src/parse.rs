@@ -41,17 +41,13 @@ pub struct Template {
 
 impl Parse for Template {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let mut clauses = vec![];
+        let mut tables = vec![];
         let mut vars = Vars::default();
 
         loop {
-            input.parse::<Token![for]>()?;
-            let ForClause {
-                vars: clause_vars,
-                table,
-            } = input.parse::<ForClause>()?;
-            vars.extend(clause_vars)?;
-            clauses.push(table);
+            let clause = input.parse::<ForClause>()?;
+            vars.extend(clause.vars)?;
+            tables.push(clause.table);
 
             if !input.peek(Token![,]) {
                 break;
@@ -69,7 +65,7 @@ impl Parse for Template {
             }
         }
 
-        let table = clauses
+        let table = tables
             .into_iter()
             .reduce(|acc, clause| acc.join(clause))
             .expect("template must have at least one input clause");
@@ -93,8 +89,6 @@ pub struct Table {
 
 impl Table {
     pub fn rows(&self) -> RowsIter<'_> {
-        self.assert_invariant();
-
         RowsIter {
             table: self,
             row: 0,
@@ -103,7 +97,7 @@ impl Table {
 }
 
 impl Table {
-    fn empty(num_cols: usize) -> Self {
+    fn new(num_cols: usize) -> Self {
         Self {
             bindings: vec![],
             num_rows: 0,
@@ -156,15 +150,10 @@ impl Table {
     }
 
     fn join(self, other: Self) -> Self {
-        self.assert_invariant();
-        other.assert_invariant();
-
         let num_cols = self.num_cols + other.num_cols;
         let num_rows = self.num_rows * other.num_rows;
         if num_rows == 0 {
-            let table = Self::empty(num_cols);
-            table.assert_invariant();
-            return table;
+            return Self::new(num_cols);
         }
 
         if num_rows == 1 {
@@ -177,7 +166,6 @@ impl Table {
                 num_rows,
                 num_cols,
             };
-            table.assert_invariant();
             return table;
         }
 
@@ -240,15 +228,14 @@ struct ForClause {
 
 impl Parse for ForClause {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
+        input.parse::<Token![for]>()?;
         let vars = input.parse::<Vars>()?;
         input.parse::<Token![in]>()?;
-
         let table = if input.peek(syn::token::Bracket) {
             parse_rows(input, &vars)?
         } else {
             parse_range_rows(input, &vars)?
         };
-
         Ok(Self { vars, table })
     }
 }
@@ -355,7 +342,7 @@ fn parse_range_rows(input: ParseStream<'_>, vars: &Vars) -> Result<Table> {
 
     let range = input.parse::<RangeInput>()?;
     let values = range.values();
-    let mut table = Table::empty(vars.len());
+    let mut table = Table::new(vars.len());
     for value in values {
         table.add_row(vars, vec![value])?;
     }
@@ -374,7 +361,7 @@ fn parse_rows(input: ParseStream<'_>, vars: &Vars) -> Result<Table> {
     let rows;
     let bracket_token = bracketed!(rows in input);
 
-    let mut table = Table::empty(vars.len());
+    let mut table = Table::new(vars.len());
     while !rows.is_empty() {
         let values = parse_row(&rows, vars)?;
         table.add_row(vars, values)?;
