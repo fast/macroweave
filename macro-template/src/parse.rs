@@ -107,17 +107,6 @@ impl Table {
         self.num_rows == 0
     }
 
-    fn add_single_row(&mut self, var: &Ident, value: TokenStream) {
-        debug_assert_eq!(self.num_cols, 1);
-
-        self.bindings.push(Binding {
-            var: var.clone(),
-            tokens: value,
-        });
-        self.num_rows += 1;
-        self.assert_invariant();
-    }
-
     fn add_row(&mut self, vars: &Vars, values: Vec<TokenStream>) -> Result<()> {
         debug_assert_eq!(self.num_cols, vars.len());
 
@@ -129,7 +118,7 @@ impl Table {
                 format!(
                     "this row provides {} value{}",
                     found,
-                    if found == 1 { "" } else { "s" }
+                    if found > 1 { "s" } else { "" }
                 ),
             );
             error.combine(Error::new_spanned(
@@ -138,7 +127,7 @@ impl Table {
                     "template variables `{}` require {} row value{}",
                     vars.display(),
                     expected,
-                    if expected == 1 { "" } else { "s" }
+                    if expected > 1 { "s" } else { "" }
                 ),
             ));
             return Err(error);
@@ -353,20 +342,20 @@ fn parse_range_rows(input: ParseStream<'_>, vars: &Vars) -> Result<Table> {
         ));
     }
 
-    let var = &vars.idents[0];
     let range = input.parse::<RangeInput>()?;
     let values = range.values();
-    if values.is_empty() {
+    let mut table = Table::empty(vars.len());
+    for value in values {
+        table.add_row(vars, vec![value])?;
+    }
+
+    if table.is_empty() {
         return Err(Error::new_spanned(
             range.tokens,
             "range input must contain at least one value",
         ));
     }
 
-    let mut table = Table::empty(vars.len());
-    for value in values {
-        table.add_single_row(var, value);
-    }
     Ok(table)
 }
 
