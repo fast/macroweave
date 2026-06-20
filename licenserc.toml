@@ -14,7 +14,7 @@
 
 headerPath = "Apache-2.0.txt"
 
-excludes = ["**/tests/ui/*.rs"]
+excludes = ["**/tests/ui/**/*.rs"]
 includes = ['**/*.rs', '**/*.yml', '**/*.yaml', '**/*.toml']
 
 [properties]

@@ -1,5 +1,5 @@
 error: range bounds must use the same integer radix
- --> tests/ui/range_radix_mismatch.rs:5:24
+ --> tests/ui/err/range_radix_mismatch.rs:5:24
   |
 5 |         for N in 0x0..=3 {
   |                        ^

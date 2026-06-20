@@ -1,5 +1,5 @@
 error: range bounds must both be integer literals, both byte literals, or both character literals
- --> tests/ui/mixed_range_bounds.rs:5:18
+ --> tests/ui/err/mixed_range_bounds.rs:5:18
   |
 5 |         for N in 'a'..=3 {
   |                  ^^^^^^^

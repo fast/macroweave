@@ -1,5 +1,5 @@
 error: range inputs require exactly one template variable
- --> tests/ui/range_multiple_variables.rs:5:14
+ --> tests/ui/err/range_multiple_variables.rs:5:14
   |
 5 |         for (Ty, Max) in 0..=2 {
   |              ^^^^^^^

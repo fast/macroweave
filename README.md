@@ -107,38 +107,37 @@ When a template contains `#( ... )*` or `#( ... ),*`, template variables are sub
 
 ### Range inputs
 
-Inputs can also be ranges of integers, characters, or bytes. Range inputs are written directly after `in`, without surrounding brackets:
+Inputs can also be ranges of integers, characters, or bytes. Range inputs are written directly after `in`, without surrounding brackets. Wrap the range in parentheses when calling a range method such as `.rev()`:
 
 ```rust
-let tuple = (1000, 100, 10);
-let mut sum = 0;
+let tuple = ("red", "green", "blue");
+let mut fields = vec![];
 
 macro_template::template! {
-    for N in 0..3 {
-        sum += tuple.N;
+    for N in (0..3).rev() {
+        fields.push(tuple.N);
     }
 }
 
-assert_eq!(sum, 1110);
+assert_eq!(fields, vec!["blue", "green", "red"]);
 ```
 
 This cannot be written using an ordinary for-loop because elements of a tuple can only be accessed by their integer literal index, not by a variable.
 
-Integer ranges preserve the radix, suffix, and shared padding width from their bounds. You can combine this crate with [`paste`](https://docs.rs/paste/) for identifier generation:
+Integer ranges preserve the radix, suffix, and shared padding width from their bounds. `.strip_prefix()` removes the radix prefix before substitution, which is useful when combining range values with [`paste`](https://docs.rs/paste/) for identifier generation:
 
 ```rust
 macro_template::template! {
-    for N in 000..=002 {
+    for N in (0x00A..=0x00C).strip_prefix() {
         paste::paste! {
-            #[derive(Debug, PartialEq, Eq)]
-            enum Demo {
-                #( [<Variant N>], )*
+            enum Pin {
+                #( [<Pin N>], )*
             }
         }
     }
 }
 
-assert_eq!(format!("{:?}", Demo::Variant001), "Variant001");
+let _ = (Pin::Pin00A, Pin::Pin00B, Pin::Pin00C);
 ```
 
 ### Cartesian products

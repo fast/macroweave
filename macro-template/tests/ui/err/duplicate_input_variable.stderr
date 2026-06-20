@@ -1,11 +1,11 @@
 error: the template variable `Ty` duplicates an earlier one
- --> tests/ui/duplicate_input_variable.rs:6:13
+ --> tests/ui/err/duplicate_input_variable.rs:6:13
   |
 6 |         for Ty in [u16] {
   |             ^^
 
 error: an earlier template variable `Ty` declared here
- --> tests/ui/duplicate_input_variable.rs:5:13
+ --> tests/ui/err/duplicate_input_variable.rs:5:13
   |
 5 |         for Ty in [u8],
   |             ^^

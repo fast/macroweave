@@ -1,5 +1,5 @@
 error: expected `,`
- --> tests/ui/missing_row_comma.rs:7:13
+ --> tests/ui/err/missing_row_comma.rs:7:13
   |
 7 |             (u32, 4),
   |             ^

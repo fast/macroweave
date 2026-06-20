@@ -1,5 +1,5 @@
 error: rows for multiple template variables must use parentheses, such as `(u16, 2)`
- --> tests/ui/bracketed_row.rs:6:13
+ --> tests/ui/err/bracketed_row.rs:6:13
   |
 6 |             [u16, 2],
   |             ^

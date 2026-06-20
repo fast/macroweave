@@ -1,11 +1,11 @@
 error: this row provides 1 value
- --> tests/ui/row_arity_mismatch.rs:6:14
+ --> tests/ui/err/row_arity_mismatch.rs:6:14
   |
 6 |             (u8),
   |              ^^
 
 error: template variables `(Ty, Max)` require 2 row values
- --> tests/ui/row_arity_mismatch.rs:5:14
+ --> tests/ui/err/row_arity_mismatch.rs:5:14
   |
 5 |         for (Ty, Max) in [
   |              ^^^^^^^

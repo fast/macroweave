@@ -1,5 +1,5 @@
 error: input list must contain at least one row
- --> tests/ui/empty_input_list.rs:5:19
+ --> tests/ui/err/empty_input_list.rs:5:19
   |
 5 |         for Ty in [] {
   |                   ^^

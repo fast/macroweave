@@ -1,0 +1,5 @@
+error: range input methods require parentheses, such as `(0..3).rev()`
+ --> tests/ui/err/range_method_without_parentheses.rs:5:23
+  |
+5 |         for N in 0..=3.rev() {
+  |                       ^
