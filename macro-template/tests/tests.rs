@@ -114,31 +114,74 @@ fn preserves_grouped_commas_in_tuple_row_values() {
 }
 
 #[test]
-fn expands_splice_block_without_repeating_surrounding_tokens() {
+fn expands_hash_paren_splice_without_repeating_surrounding_tokens() {
     template! {
         for N in 0..=2 {
-            let values = [100usize, @splice { N, } 200usize];
+            let values = [100usize, #(N),*, 200usize];
         }
     }
 
     assert_eq!(values, [100, 0, 1, 2, 200]);
 }
 
+#[test]
+#[allow(clippy::vec_init_then_push)]
+fn expands_hash_paren_splice_with_statements() {
+    let mut values = vec![100usize];
+
+    template! {
+        for N in 0..=2 {
+            #( values.push(N); )*
+            values.push(200usize);
+        }
+    }
+
+    assert_eq!(values, [100, 0, 1, 2, 200]);
+}
+
+#[test]
+fn expands_hash_paren_splice_with_separator() {
+    template! {
+        for N in 0..=2 {
+            let values = [#(N),*];
+        }
+    }
+
+    assert_eq!(values, [0, 1, 2]);
+}
+
+#[test]
+fn accepts_token_tree_as_hash_paren_splice_separator() {
+    macro_rules! stringify_tokens {
+        ($($tokens:tt)*) => {
+            stringify!($($tokens)*)
+        };
+    }
+
+    template! {
+        for N in [first, second] {
+            let tokens = stringify_tokens! { #(N)(separator)* };
+        }
+    }
+
+    assert_eq!(tokens, "first(separator) second");
+}
+
 template! {
     for Variant in [First, Second] {
         #[derive(Debug, PartialEq, Eq)]
-        enum SpliceBlockEnum {
-            @splice { Variant, }
+        enum SpliceEnum {
+            #(Variant),*,
             Other,
         }
     }
 }
 
 #[test]
-fn expands_splice_block_in_item_groups() {
-    assert_eq!(format!("{:?}", SpliceBlockEnum::First), "First");
-    assert_eq!(format!("{:?}", SpliceBlockEnum::Second), "Second");
-    assert_eq!(format!("{:?}", SpliceBlockEnum::Other), "Other");
+fn expands_splice_in_item_groups() {
+    assert_eq!(format!("{:?}", SpliceEnum::First), "First");
+    assert_eq!(format!("{:?}", SpliceEnum::Second), "Second");
+    assert_eq!(format!("{:?}", SpliceEnum::Other), "Other");
 }
 
 template! {
@@ -148,7 +191,7 @@ template! {
     ] {
         #[derive(Debug, PartialEq, Eq)]
         enum Name {
-            @splice { Variant, }
+            #(Variant),*
         }
     }
 }
@@ -160,7 +203,7 @@ fn preserves_outer_variable_tokens_in_splice_templates() {
 }
 
 #[test]
-fn preserves_hash_paren_repetition_for_downstream_macros() {
+fn preserves_hash_paren_non_repetition_for_downstream_macros() {
     macro_rules! stringify_tokens {
         ($($tokens:tt)*) => {
             stringify!($($tokens)*)
@@ -169,11 +212,11 @@ fn preserves_hash_paren_repetition_for_downstream_macros() {
 
     template! {
         for N in [0] {
-            let tokens = stringify_tokens! { #(N)* };
+            let tokens = stringify_tokens! { #(N)+ };
         }
     }
 
-    assert_eq!(tokens, "# (0) *");
+    assert_eq!(tokens, "# (0) +");
 }
 
 #[test]
@@ -211,7 +254,7 @@ fn preserves_bare_at_brace_for_downstream_macros() {
 }
 
 #[test]
-fn expands_match_arms_from_splice_block() {
+fn expands_match_arms_from_splice() {
     fn parse_keyword(text: &str) -> Option<u8> {
         template! {
             for (Pat, Value) in [
@@ -219,7 +262,7 @@ fn expands_match_arms_from_splice_block() {
                 ("await", 2u8),
             ] {
                 match text {
-                    @splice { Pat => Some(Value), }
+                    #(Pat => Some(Value)),*,
                     _ => None,
                 }
             }
@@ -237,7 +280,7 @@ fn treats_fat_arrow_as_plain_row_tokens() {
         template! {
             for Arm in [0 => Some("zero"), 1 => Some("one")] {
                 match value {
-                    @splice { Arm, }
+                    #(Arm),*,
                     _ => None,
                 }
             }
@@ -522,12 +565,12 @@ fn combines_tuple_rows_and_range_inputs() {
 }
 
 #[test]
-fn expands_splice_block_over_cartesian_rows() {
+fn expands_splice_over_cartesian_rows() {
     template! {
         for Left in [1usize, 2usize],
         for Right in [10usize, 20usize] {
             const PAIRS: &[(usize, usize)] = &[
-                @splice { (Left, Right), }
+                #((Left, Right)),*
             ];
         }
     }

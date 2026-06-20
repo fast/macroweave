@@ -21,7 +21,7 @@ mod parse;
 
 /// Generates repeated Rust code from one or more table-driven input clauses.
 ///
-/// See the crate-level documentation for the input syntax, `@splice` behavior, and examples.
+/// See the crate-level documentation for the input syntax, splice behavior, and examples.
 #[proc_macro]
 pub fn template(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     match expand::expand(input.into()) {

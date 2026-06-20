@@ -28,7 +28,7 @@ pub fn expand(input: TokenStream) -> Result<TokenStream> {
     let (table, template) = template.into_parts();
 
     let mut found_splice = false;
-    let expanded = expand_splice_blocks(&table, template.clone(), &mut found_splice);
+    let expanded = expand_splices(&table, template.clone(), &mut found_splice);
     if found_splice {
         return Ok(expanded);
     }
@@ -57,17 +57,13 @@ fn substitute_tokens(bindings: &[Binding], tokens: TokenStream) -> TokenStream {
     new_tokens
 }
 
-fn expand_splice_blocks(
-    table: &Table,
-    tokens: TokenStream,
-    found_splice: &mut bool,
-) -> TokenStream {
+fn expand_splices(table: &Table, tokens: TokenStream, found_splice: &mut bool) -> TokenStream {
     let mut tokens = tokens.into_iter().collect::<Vec<_>>();
 
     let mut i = 0;
     while i < tokens.len() {
         if let TokenTree::Group(group) = &mut tokens[i] {
-            let content = expand_splice_blocks(table, group.stream(), found_splice);
+            let content = expand_splices(table, group.stream(), found_splice);
             let mut new_group = Group::new(group.delimiter(), content);
             new_group.set_span(group.span());
             *group = new_group;
@@ -75,37 +71,55 @@ fn expand_splice_blocks(
             continue;
         }
 
-        let Some(template) = enter_splice_block(&tokens[i..]) else {
+        let Some(splice) = enter_hash_repetition(&tokens[i..]) else {
             i += 1;
             continue;
         };
 
         *found_splice = true;
         let mut repeated = vec![];
-        for bindings in table.rows() {
-            repeated.extend(substitute_tokens(bindings, template.clone()));
+        for (row, bindings) in table.rows().enumerate() {
+            if row > 0 {
+                if let Some(separator) = &splice.separator {
+                    repeated.push(separator.clone());
+                }
+            }
+            repeated.extend(substitute_tokens(bindings, splice.template.clone()));
         }
 
         let repeated_len = repeated.len();
-        tokens.splice(i..i + 3, repeated);
+        tokens.splice(i..i + splice.consumed_len, repeated);
         i += repeated_len;
     }
 
     tokens.into_iter().collect()
 }
 
-fn enter_splice_block(tokens: &[TokenTree]) -> Option<TokenStream> {
-    let [
-        TokenTree::Punct(at),
-        TokenTree::Ident(ident),
-        TokenTree::Group(group),
-        ..,
-    ] = tokens
-    else {
+struct Splice {
+    template: TokenStream,
+    separator: Option<TokenTree>,
+    consumed_len: usize,
+}
+
+fn enter_hash_repetition(tokens: &[TokenTree]) -> Option<Splice> {
+    let [TokenTree::Punct(hash), TokenTree::Group(group), rest @ ..] = tokens else {
         return None;
     };
-    if at.as_char() != '@' || ident != "splice" || group.delimiter() != Delimiter::Brace {
+    if hash.as_char() != '#' || group.delimiter() != Delimiter::Parenthesis {
         return None;
     }
-    Some(group.stream())
+
+    match rest {
+        [TokenTree::Punct(star), ..] if star.as_char() == '*' => Some(Splice {
+            template: group.stream(),
+            separator: None,
+            consumed_len: 3,
+        }),
+        [separator, TokenTree::Punct(star), ..] if star.as_char() == '*' => Some(Splice {
+            template: group.stream(),
+            separator: Some(separator.clone()),
+            consumed_len: 4,
+        }),
+        _ => None,
+    }
 }

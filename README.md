@@ -26,7 +26,7 @@ This crate is inspired by [`match-template`](https://github.com/tisonkun/match-t
 
 When developing ScopeDB, we introduced these two proc-macros to generate repeated code for match arms and impls. I noticed that they share a common pattern: iterating over a table of values and generating code based on it. I wanted to unify these patterns into a single, concise, but flexible macro that can handle various use cases. That's how `macro-template` was born.
 
-Last but not least, I found [`seq-macro`](https://github.com/dtolnay/seq-macro) and borrowed some ideas from it, such as iterating over a range of numbers, characters, or bytes, and using a syntax `@splice { }` (equivalent to `seq-macro`'s or `quote`'s `#( ... )*`) to generate partial repeated substitutions. This eliminates the need for an extra `template_match!` to handle repetitions in match arms, and allows for more flexible code generation.
+Last but not least, I found [`seq-macro`](https://github.com/dtolnay/seq-macro) and borrowed some ideas from it, such as iterating over a range of numbers, characters, or bytes, and using a syntax `#( ... )*` to generate partial repeated substitutions. This eliminates the need for an extra `template_match!` to handle repetitions in match arms, and allows for more flexible code generation.
 
 Go back to the beginning, why do you need `macro_template::template!` at all? Isn't it the same as a simple `macro_rules!`?
 
@@ -101,20 +101,20 @@ macro_template::template! {
 }
 ```
 
-Without `@splice`, the whole template body is repeated once for each row. You can also do substitutions only partially with `@splice`. For example, to generate match arms:
+Without splice syntax, the whole template body is repeated once for each row. You can also do substitutions only partially with `#( ... )*`. Like `quote`, a single separator token tree can be written before `*`, such as `#( ... ),*`. For example, to generate match arms:
 
 ```rust,ignore
 macro_template::template! {
     for T in [Int, Real, Double] {
         match Foo {
-            @splice { EvalType::T => { panic!("{}", EvalType::T); }, }
+            #( EvalType::T => { panic!("{}", EvalType::T); } ),*,
             EvalType::Other => unreachable!(),
         }
     }
 }
 ```
 
-When a template contains `@splice`, template variables are substituted only inside `@splice { ... }`, and surrounding tokens are emitted once. Surrounding identifiers stay literal, even when they have the same name as a template variable. If a value should vary, place it in the splice block.
+When a template contains `#( ... )*` or `#( ... ),*`, template variables are substituted only inside the splice body, and surrounding tokens are emitted once. Surrounding identifiers stay literal, even when they have the same name as a template variable. If a value should vary, place it in the splice body.
 
 Naturally, if the match arm differs left-hand side and right-hand side:
 
@@ -126,7 +126,7 @@ macro_template::template! {
         (Cherry, "cherry"),
     ] {
         match kind {
-            @splice { Kind::K => { println!("{}", Value); }, }
+            #( Kind::K => { println!("{}", Value); } ),*
         }
     }
 }
