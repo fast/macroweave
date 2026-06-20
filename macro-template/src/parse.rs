@@ -42,7 +42,7 @@ pub struct Template {
 impl Parse for Template {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let mut clauses = vec![];
-        let mut vars = vec![];
+        let mut vars = Vars::default();
 
         loop {
             input.parse::<Token![for]>()?;
@@ -50,7 +50,7 @@ impl Parse for Template {
                 vars: clause_vars,
                 table,
             } = input.parse::<ForClause>()?;
-            validate_clause_vars(clause_vars, &mut vars)?;
+            vars.extend(clause_vars)?;
             clauses.push(table);
 
             if !input.peek(Token![,]) {
@@ -140,8 +140,7 @@ impl Table {
 
         let row_start = self.bindings.len();
         self.bindings.extend(
-            vars.idents
-                .iter()
+            vars.iter()
                 .cloned()
                 .zip(values)
                 .map(|(var, value)| Binding { var, tokens: value }),
@@ -232,7 +231,7 @@ impl<'a> Iterator for RowsIter<'a> {
 }
 
 struct ForClause {
-    vars: Vec<Ident>,
+    vars: Vars,
     table: Table,
 }
 
@@ -241,37 +240,14 @@ impl Parse for ForClause {
         let vars = input.parse::<Vars>()?;
         input.parse::<Token![in]>()?;
 
-        let (vars, table) = if input.peek(syn::token::Bracket) {
-            parse_rows(input, vars)?
+        let table = if input.peek(syn::token::Bracket) {
+            parse_rows(input, &vars)?
         } else {
-            parse_range_rows(input, vars)?
+            parse_range_rows(input, &vars)?
         };
 
         Ok(Self { vars, table })
     }
-}
-
-fn validate_clause_vars(new_vars: Vec<Ident>, existing_vars: &mut Vec<Ident>) -> Result<()> {
-    existing_vars.extend(new_vars);
-    existing_vars.sort();
-
-    for vars in existing_vars.windows(2) {
-        let previous = &vars[0];
-        let duplicate = &vars[1];
-        if previous == duplicate {
-            let mut error = Error::new_spanned(
-                duplicate,
-                format!("the template variable `{duplicate}` duplicates an earlier one"),
-            );
-            error.combine(Error::new_spanned(
-                previous,
-                format!("an earlier template variable `{previous}` declared here"),
-            ));
-            return Err(error);
-        }
-    }
-
-    Ok(())
 }
 
 fn table_join(clauses: Vec<Table>) -> Table {
@@ -286,6 +262,7 @@ fn table_join(clauses: Vec<Table>) -> Table {
 
     table
 }
+#[derive(Default)]
 struct Vars {
     idents: Vec<Ident>,
 }
@@ -301,15 +278,35 @@ impl Vars {
         self.idents.len()
     }
 
-    fn validate(&self) -> Result<()> {
-        for (index, ident) in self.idents.iter().enumerate() {
-            if self.idents[..index]
-                .iter()
-                .any(|previous| previous == ident)
-            {
-                return Err(Error::new_spanned(ident, "duplicate template variable"));
+    fn iter(&self) -> std::slice::Iter<'_, Ident> {
+        self.idents.iter()
+    }
+
+    fn push(&mut self, ident: Ident) -> Result<()> {
+        if self.idents.iter().any(|previous| previous == &ident) {
+            return Err(Error::new_spanned(ident, "duplicate template variable"));
+        }
+
+        self.idents.push(ident);
+        Ok(())
+    }
+
+    fn extend(&mut self, vars: Self) -> Result<()> {
+        for ident in &vars.idents {
+            if let Some(previous) = self.idents.iter().find(|previous| *previous == ident) {
+                let mut error = Error::new_spanned(
+                    ident,
+                    format!("the template variable `{ident}` duplicates an earlier one"),
+                );
+                error.combine(Error::new_spanned(
+                    previous,
+                    format!("an earlier template variable `{previous}` declared here"),
+                ));
+                return Err(error);
             }
         }
+
+        self.idents.extend(vars.idents);
         Ok(())
     }
 
@@ -330,32 +327,34 @@ impl Vars {
 
 impl Parse for Vars {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let idents = if input.peek(syn::token::Paren) {
+        let mut vars = Self::default();
+
+        if input.peek(syn::token::Paren) {
             let content;
             let paren_token = parenthesized!(content in input);
-            let idents = Punctuated::<Ident, Token![,]>::parse_terminated(input)?;
-            let idents = idents.into_iter().collect::<Vec<_>>();
+            let idents = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?;
             if idents.is_empty() {
                 return Err(Error::new(
                     paren_token.span.join(),
                     "expected at least one template variable",
                 ));
             }
-            idents
+
+            for ident in idents {
+                vars.push(ident)?;
+            }
         } else if let Ok(ident) = input.parse::<Ident>() {
-            vec![ident]
+            vars.push(ident)?;
         } else {
             return Err(input
                 .error("multiple template variables must use parentheses, such as `(Ty, Width)`"));
         };
 
-        let vars = Self { idents };
-        vars.validate()?;
         Ok(vars)
     }
 }
 
-fn parse_range_rows(input: ParseStream<'_>, vars: Vars) -> Result<(Vec<Ident>, Table)> {
+fn parse_range_rows(input: ParseStream<'_>, vars: &Vars) -> Result<Table> {
     if vars.len() != 1 {
         return Err(Error::new_spanned(
             vars,
@@ -367,7 +366,7 @@ fn parse_range_rows(input: ParseStream<'_>, vars: Vars) -> Result<(Vec<Ident>, T
     let values = range.values();
     let mut table = Table::empty(vars.len());
     for value in values {
-        table.add_row(&vars, vec![value])?;
+        table.add_row(vars, vec![value])?;
     }
 
     if table.is_empty() {
@@ -377,17 +376,17 @@ fn parse_range_rows(input: ParseStream<'_>, vars: Vars) -> Result<(Vec<Ident>, T
         ));
     }
 
-    Ok((vars.idents, table))
+    Ok(table)
 }
 
-fn parse_rows(input: ParseStream<'_>, vars: Vars) -> Result<(Vec<Ident>, Table)> {
+fn parse_rows(input: ParseStream<'_>, vars: &Vars) -> Result<Table> {
     let row_values;
     let bracket_token = bracketed!(row_values in input);
 
     let mut table = Table::empty(vars.len());
     while !row_values.is_empty() {
-        let values = parse_row(&row_values, &vars)?;
-        table.add_row(&vars, values)?;
+        let values = parse_row(&row_values, vars)?;
+        table.add_row(vars, values)?;
         if row_values.is_empty() {
             break;
         }
@@ -401,7 +400,7 @@ fn parse_rows(input: ParseStream<'_>, vars: Vars) -> Result<(Vec<Ident>, Table)>
         ));
     }
 
-    Ok((vars.idents, table))
+    Ok(table)
 }
 
 fn parse_row(input: ParseStream<'_>, vars: &Vars) -> Result<Vec<TokenStream>> {
@@ -421,9 +420,6 @@ fn parse_row(input: ParseStream<'_>, vars: &Vars) -> Result<Vec<TokenStream>> {
                 row.parse::<Token![,]>()?;
             }
         }
-        if !row.is_empty() {
-            return Err(row.error("unexpected tokens in row"));
-        }
         return Ok(values);
     }
 
@@ -432,7 +428,7 @@ fn parse_row(input: ParseStream<'_>, vars: &Vars) -> Result<Vec<TokenStream>> {
     match vars.len() {
         1 => Ok(vec![value]),
         _ => Err(Error::new_spanned(
-            &vars.idents[0],
+            vars,
             "plain rows require exactly one template variable",
         )),
     }
