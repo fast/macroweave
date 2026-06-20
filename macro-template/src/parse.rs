@@ -17,6 +17,7 @@ use std::fmt;
 
 use proc_macro2::Ident;
 use proc_macro2::Literal;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::ToTokens;
@@ -467,22 +468,27 @@ struct RangeInput {
     suffix: String,
     width: usize,
     radix: RangeRadix,
+    reverse: bool,
+    strip_prefix: bool,
     tokens: TokenStream,
 }
 
 impl RangeInput {
     fn values(&self) -> Vec<TokenStream> {
-        if self.start > self.end || (!self.inclusive && self.start == self.end) {
+        let mut values = if self.start > self.end || (!self.inclusive && self.start == self.end) {
             vec![]
         } else if self.inclusive {
-            (self.start..=self.end)
-                .filter_map(|v| self.value_to_tokens(v))
-                .collect()
+            (self.start..=self.end).collect()
         } else {
-            (self.start..self.end)
-                .filter_map(|v| self.value_to_tokens(v))
-                .collect()
+            (self.start..self.end).collect()
+        };
+        if self.reverse {
+            values.reverse();
         }
+        values
+            .into_iter()
+            .filter_map(|v| self.value_to_tokens(v))
+            .collect()
     }
 
     fn value_to_tokens(&self, value: u64) -> Option<TokenStream> {
@@ -490,13 +496,33 @@ impl RangeInput {
             RangeKind::Integer => {
                 let width = self.width;
                 let repr = match self.radix {
+                    RangeRadix::Binary if self.strip_prefix => {
+                        format!("{:0width$b}{}", value, self.suffix)
+                    }
                     RangeRadix::Binary => format!("0b{:0width$b}{}", value, self.suffix),
+                    RangeRadix::Octal if self.strip_prefix => {
+                        format!("{:0width$o}{}", value, self.suffix)
+                    }
                     RangeRadix::Octal => format!("0o{:0width$o}{}", value, self.suffix),
                     RangeRadix::Decimal => format!("{:0width$}{}", value, self.suffix),
+                    RangeRadix::LowerHex if self.strip_prefix => {
+                        format!("{:0width$x}{}", value, self.suffix)
+                    }
                     RangeRadix::LowerHex => format!("0x{:0width$x}{}", value, self.suffix),
+                    RangeRadix::UpperHex if self.strip_prefix => {
+                        format!("{:0width$X}{}", value, self.suffix)
+                    }
                     RangeRadix::UpperHex => format!("0x{:0width$X}{}", value, self.suffix),
                 };
-                Some(repr.parse().expect("generated range literal should parse"))
+                if self.strip_prefix {
+                    Some(if self.radix == RangeRadix::Decimal {
+                        repr.parse().expect("generated range literal should parse")
+                    } else {
+                        stripped_integer_to_tokens(&repr)
+                    })
+                } else {
+                    Some(repr.parse().expect("generated range literal should parse"))
+                }
             }
             RangeKind::Byte => u8::try_from(value)
                 .ok()
@@ -511,6 +537,98 @@ impl RangeInput {
 
 impl Parse for RangeInput {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
+        let mut range;
+        if input.peek(syn::token::Paren) {
+            let content;
+            parenthesized!(content in input);
+            range = content.parse::<RangeCore>()?.into_range_input();
+            parse_range_methods(input, &mut range)?;
+        } else {
+            range = input.parse::<RangeCore>()?.into_range_input();
+            if input.peek(Token![.]) {
+                return Err(
+                    input.error("range input methods require parentheses, such as `(0..3).rev()`")
+                );
+            }
+        }
+
+        if range.strip_prefix && range.kind != RangeKind::Integer {
+            return Err(Error::new_spanned(
+                range.tokens.clone(),
+                "strip_prefix is only supported on integer ranges",
+            ));
+        }
+
+        Ok(range)
+    }
+}
+
+fn parse_range_methods(input: ParseStream<'_>, range: &mut RangeInput) -> Result<()> {
+    while input.peek(Token![.]) {
+        input.parse::<Token![.]>()?;
+        let method = input.parse::<Ident>()?;
+        let args;
+        parenthesized!(args in input);
+        if !args.is_empty() {
+            return Err(args.error("range input methods do not accept arguments"));
+        }
+
+        match method.to_string().as_str() {
+            "rev" => range.reverse = !range.reverse,
+            "strip_prefix" => range.strip_prefix = true,
+            _ => return Err(Error::new_spanned(method, "unknown range input method")),
+        }
+    }
+
+    Ok(())
+}
+
+struct RangeCore {
+    start: RangeBound,
+    end: RangeBound,
+    inclusive: bool,
+    operator: TokenStream,
+}
+
+impl RangeCore {
+    fn into_range_input(self) -> RangeInput {
+        let Self {
+            start,
+            end,
+            inclusive,
+            operator,
+        } = self;
+        let tokens = TokenStream::from_iter([start.tokens.clone(), operator, end.tokens.clone()]);
+
+        let suffix = if start.suffix.is_empty() {
+            end.suffix
+        } else {
+            start.suffix
+        };
+
+        let radix = if start.radix == end.radix {
+            start.radix
+        } else {
+            RangeRadix::UpperHex
+        };
+
+        RangeInput {
+            start: start.value,
+            end: end.value,
+            inclusive,
+            kind: start.kind,
+            suffix,
+            width: start.width.min(end.width),
+            radix,
+            reverse: false,
+            strip_prefix: false,
+            tokens,
+        }
+    }
+}
+
+impl Parse for RangeCore {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         let start = input.parse::<RangeBound>()?;
         let (inclusive, operator) = if input.peek(Token![..=]) {
             (true, input.parse::<Token![..=]>()?.into_token_stream())
@@ -519,7 +637,6 @@ impl Parse for RangeInput {
         };
         let end = input.parse::<RangeBound>()?;
 
-        let tokens = TokenStream::from_iter([start.tokens.clone(), operator, end.tokens.clone()]);
         if start.kind != end.kind {
             return Err(Error::new_spanned(
                 TokenStream::from_iter([start.tokens, end.tokens]),
@@ -527,41 +644,31 @@ impl Parse for RangeInput {
             ));
         }
 
-        let suffix = if start.suffix.is_empty() {
-            end.suffix
-        } else if end.suffix.is_empty() || start.suffix == end.suffix {
-            start.suffix
-        } else {
+        if !start.suffix.is_empty() && !end.suffix.is_empty() && start.suffix != end.suffix {
             return Err(Error::new_spanned(
                 end.tokens,
                 "range bounds must use the same integer suffix",
             ));
-        };
+        }
 
-        let radix = if start.radix == end.radix {
-            start.radix
-        } else if matches!(
-            (start.radix, end.radix),
-            (RangeRadix::LowerHex, RangeRadix::UpperHex)
-                | (RangeRadix::UpperHex, RangeRadix::LowerHex)
-        ) {
-            RangeRadix::UpperHex
-        } else {
+        if start.radix != end.radix
+            && !matches!(
+                (start.radix, end.radix),
+                (RangeRadix::LowerHex, RangeRadix::UpperHex)
+                    | (RangeRadix::UpperHex, RangeRadix::LowerHex)
+            )
+        {
             return Err(Error::new_spanned(
                 end.tokens,
                 "range bounds must use the same integer radix",
             ));
-        };
+        }
 
         Ok(Self {
-            start: start.value,
-            end: end.value,
+            start,
+            end,
             inclusive,
-            kind: start.kind,
-            suffix,
-            width: start.width.min(end.width),
-            radix,
-            tokens,
+            operator,
         })
     }
 }
@@ -620,6 +727,35 @@ enum RangeRadix {
     Decimal,
     LowerHex,
     UpperHex,
+}
+
+fn stripped_integer_to_tokens(repr: &str) -> TokenStream {
+    let mut tokens = TokenStream::new();
+    let mut chars = repr.chars().peekable();
+
+    while let Some(ch) = chars.peek().copied() {
+        let mut fragment = String::new();
+        let is_digit = ch.is_ascii_digit();
+        while let Some(ch) = chars.peek().copied() {
+            if ch.is_ascii_digit() == is_digit {
+                fragment.push(ch);
+                chars.next();
+            } else {
+                break;
+            }
+        }
+
+        if is_digit {
+            let literal = fragment
+                .parse::<TokenStream>()
+                .expect("generated decimal fragment should parse");
+            tokens.extend(literal);
+        } else {
+            tokens.extend([TokenTree::Ident(Ident::new(&fragment, Span::call_site()))]);
+        }
+    }
+
+    tokens
 }
 
 fn parse_integer_bound(value: syn::LitInt) -> Result<RangeBound> {

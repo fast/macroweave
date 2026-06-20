@@ -308,6 +308,20 @@ fn expands_integer_range_input_for_tuple_fields() {
 
 #[test]
 #[allow(clippy::vec_init_then_push)]
+fn expands_reversed_range_input() {
+    let mut values = vec![];
+
+    template! {
+        for N in (0..=3).rev() {
+            values.push(N);
+        }
+    }
+
+    assert_eq!(values, [3, 2, 1, 0]);
+}
+
+#[test]
+#[allow(clippy::vec_init_then_push)]
 fn expands_character_range_input() {
     let mut chars = vec![];
 
@@ -607,6 +621,23 @@ fn works_with_paste_for_padded_decimal_ident_pasting() {
     }
 
     let _ = (Pin000, Pin001, Pin002);
+}
+
+#[test]
+fn works_with_paste_for_stripped_hex_prefix_ident_pasting() {
+    template! {
+        for P in (0x00A..=0x00C).rev().strip_prefix() {
+            paste::paste! {
+                enum Pins {
+                    #( [<Pin P>], )*
+                }
+            }
+        }
+    }
+
+    assert_eq!(Pins::Pin00C as usize, 0);
+    assert_eq!(Pins::Pin00B as usize, 1);
+    assert_eq!(Pins::Pin00A as usize, 2);
 }
 
 #[test]
