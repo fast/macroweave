@@ -22,7 +22,7 @@ macro-template provides `template!`, a procedural macro for generating repeated 
 
 ## Motivation
 
-`macro-template` came out of a ScopeDB cleanup where two procedural macros were doing almost the same job from different angles: [`match-template`](https://github.com/tisonkun/match-template/) generated match arms from variant/type mappings, while [`macro_find_and_replace`](https://github.com/lord-ne/rust-macro-find-and-replace/) repeated a Rust fragment after replacing one token with each type in a list.
+`macro-template` came out of a ScopeDB code refactor where two procedural macros were doing almost the same job from different repetition patterns: [`match-template`](https://github.com/tisonkun/match-template/) generated match arms from variant/type mappings, while [`macro_find_and_replace`](https://github.com/lord-ne/rust-macro-find-and-replace/) repeated a Rust fragment after replacing one token with each type in a list.
 
 The common shape was simpler than either macro's DSL: write down a small table, bind one or more identifiers to each row, and expand ordinary Rust tokens with those bindings. Later, [`seq-macro`](https://github.com/dtolnay/seq-macro) made the same pattern visible for ranges: bind an identifier to each number, byte, or character, then expand a fragment, with `#( ... )*` for the part that repeats inside a surrounding item.
 
@@ -30,7 +30,7 @@ The common shape was simpler than either macro's DSL: write down a small table, 
 
 ## Examples
 
-The examples below cover whole-body repetition, partial repetition, ranges, and multi-dimensional inputs.
+The examples below cover whole-body repetition, partial repetition, ranges, and multidimensional inputs.
 
 ### Whole-body repetition
 
