@@ -13,11 +13,15 @@
 # limitations under the License.
 
 [workspace]
-members = ["xtask"]
+members = ["macro-template", "xtask"]
 resolver = "3"
 
 [workspace.package]
 edition = "2024"
+homepage = "https://github.com/fast/macro-template"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/fast/macro-template"
 rust-version = "1.85.0"
 
 [workspace.lints.rust]
@@ -36,32 +40,5 @@ shared-version = true
 sign-tag = true
 tag-name = "v{{version}}"
 
-[package]
-categories = ["development-tools::procedural-macro-helpers"]
-description = "Procedural macros for small compile-time repetitions over identifier lists."
-edition = "2024"
-homepage = "https://github.com/fast/macrotable"
-keywords = ["macro", "repeat", "splice", "codegen"]
-license = "Apache-2.0"
-name = "macrotable"
-readme = "README.md"
-repository = "https://github.com/fast/macrotable"
-rust-version = "1.85.0"
-version = "0.1.0"
-
-[lib]
-proc-macro = true
-
-[dependencies]
-proc-macro2 = "1.0"
-syn = { version = "2.0", default-features = false, features = [
-  "parsing",
-  "printing",
-  "proc-macro",
-] }
-
-[dev-dependencies]
-trybuild = "1.0"
-
-[lints]
-workspace = true
+[workspace.dependencies]
+macrotable = { path = "macro-template" }

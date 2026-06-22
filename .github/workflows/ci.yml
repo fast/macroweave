@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: metadata
         run: |
-          msrv=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["rust-version"])')
+          msrv=$(yq '.workspace.package.rust-version' Cargo.toml)
           echo "MSRV: $msrv"
           echo "rust-versions=[\"${msrv}\", \"stable\"]" >> "$GITHUB_OUTPUT"
 
