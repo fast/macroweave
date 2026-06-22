@@ -1,0 +1,5 @@
+error: expected at least one binding in tuple pattern
+ --> tests/ui/err/empty_tuple_pattern.rs:4:13
+  |
+4 |     repeat!(() in [] {
+  |             ^^

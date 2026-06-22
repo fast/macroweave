@@ -54,6 +54,33 @@ fn repeat_expands_statements() {
 }
 
 #[test]
+fn repeat_accepts_trailing_comma_in_input_list() {
+    let mut values = vec![];
+    let one = 1usize;
+    let two = 2usize;
+
+    repeat!(#value in [one, two,] {
+        values.push(#value);
+    });
+
+    assert_eq!(values, [1, 2]);
+}
+
+#[test]
+fn repeat_leaves_bare_identifiers_unchanged() {
+    let mut values = vec![];
+    let source = 1usize;
+
+    repeat!(#value in [source] {
+        let value = 2usize;
+        values.push(value);
+        values.push(#value);
+    });
+
+    assert_eq!(values, [2, 1]);
+}
+
+#[test]
 fn repeat_expands_tuple_bindings() {
     let mut total = 0usize;
     let one = 1usize;
@@ -65,6 +92,20 @@ fn repeat_expands_tuple_bindings() {
     });
 
     assert_eq!(total, 3);
+}
+
+#[test]
+fn repeat_accepts_trailing_comma_after_tuple_rows() {
+    let mut values = vec![];
+    let one = 1usize;
+    let two = 2usize;
+
+    repeat!((#name, #value) in [(first, one), (second, two),] {
+        let #name = #value;
+        values.push(#name);
+    });
+
+    assert_eq!(values, [1, 2]);
 }
 
 #[test]
@@ -112,6 +153,21 @@ fn repeat_works_with_renamed_nested_macros_when_names_are_distinct() {
     });
 
     assert_eq!(names, ["TypeA TypeA", "TypeB TypeB"]);
+}
+
+#[test]
+fn repeat_preserves_hash_paren_non_repetition_for_downstream_macros() {
+    macro_rules! stringify_tokens {
+        ($($tokens:tt)*) => {
+            stringify!($($tokens)*)
+        };
+    }
+
+    repeat!(#value in [source] {
+        let tokens = stringify_tokens! { #( #value )+ };
+    });
+
+    assert_eq!(tokens, "# (source) +");
 }
 
 enum MyType {
@@ -174,4 +230,19 @@ fn splice_expands_without_separator() {
     });
 
     assert_eq!(values, [1, 2, 3]);
+}
+
+#[test]
+fn splice_accepts_token_tree_separator() {
+    macro_rules! stringify_tokens {
+        ($($tokens:tt)*) => {
+            stringify!($($tokens)*)
+        };
+    }
+
+    splice!(#word in [first, second] {
+        let tokens = stringify_tokens! { #( #word )(separator)* };
+    });
+
+    assert_eq!(tokens, "first(separator) second");
 }

@@ -1,0 +1,5 @@
+error: input list must contain at least one row
+ --> tests/ui/err/empty_input_list.rs:4:19
+  |
+4 |     repeat!(#T in [] {
+  |                   ^^
