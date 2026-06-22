@@ -42,86 +42,68 @@ one item that an attribute or derive macro can annotate.
 
 ### Whole-body repetition
 
-Use `repeat!` when every repeated block can stand on its own:
+Use `repeat!` when each expansion is a complete item or statement:
 
 ```rust
 use macrotable::repeat;
 
 #[derive(Debug, PartialEq, Eq)]
-enum MetricValue {
+enum QueryValue {
+    Signed(i128),
     Unsigned(u128),
 }
 
-trait IntoMetricValue {
-    fn into_metric_value(self) -> MetricValue;
-}
-
-repeat!(#T in [u8, u16, u32, u64, usize] {
-    impl IntoMetricValue for #T {
-        fn into_metric_value(self) -> MetricValue {
-            MetricValue::Unsigned(self as u128)
+repeat!((#T, #Variant, #Out) in [
+    (i8, Signed, i128),
+    (i16, Signed, i128),
+    (u8, Unsigned, u128),
+    (u16, Unsigned, u128),
+] {
+    impl From<#T> for QueryValue {
+        fn from(value: #T) -> Self {
+            QueryValue::#Variant(value as #Out)
         }
     }
 });
 
-assert_eq!(42u16.into_metric_value(), MetricValue::Unsigned(42));
+assert_eq!(QueryValue::from(-7i16), QueryValue::Signed(-7));
+assert_eq!(QueryValue::from(42u16), QueryValue::Unsigned(42));
 ```
 
 ### Partial repetition
 
-Use `splice!` when repeated pieces must fit inside one surrounding Rust
-construct:
+Use `splice!` when one Rust construct needs repeated pieces inside it:
 
 ```rust
 use macrotable::splice;
 
-struct WorkerStats {
-    queued: usize,
-    running: usize,
-    failed: usize,
-}
-
-impl WorkerStats {
-    fn counters(&self) -> [(&'static str, usize); 3] {
-        splice!(#field in [queued, running, failed] {
-            [ #( (stringify!(#field), self.#field) ),* ]
-        })
+splice!(#Command in [Build, Test, Publish] {
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    enum Command {
+        #( #Command, )*
     }
-}
 
-let stats = WorkerStats {
-    queued: 4,
-    running: 2,
-    failed: 1,
-};
+    impl Command {
+        fn as_str(self) -> &'static str {
+            match self {
+                #( Command::#Command => stringify!(#Command), )*
+            }
+        }
+    }
+});
 
-assert_eq!(
-    stats.counters(),
-    [("queued", 4), ("running", 2), ("failed", 1)]
-);
+assert_eq!(Command::Build.as_str(), "Build");
+assert_eq!(Command::Publish.as_str(), "Publish");
 ```
 
 `#( ... ),*` repeats without a trailing comma. Put the comma inside the
 fragment, as in `#( ..., )*`, when every repeated item should carry it.
 
-Run the complete example with:
+Run a complete example that combines both macros:
 
 ```sh
 cargo run --example metrics
 ```
-
-## Rules
-
-- Bind placeholders as `#name` and use them as `#name`.
-- Bare identifiers are left unchanged.
-- Input values must be single identifiers. Alias complex types first.
-- Tuple rows can bind multiple placeholders, and `_` skips a row value.
-- In `splice!`, placeholders from the current invocation are only available
-  inside `#( ... )*`.
-- Nested invocations are supported. Use different placeholder names at each
-  level.
-
-See the crate documentation for full syntax and error behavior.
 
 ## Minimum Rust version policy
 

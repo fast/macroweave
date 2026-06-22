@@ -95,6 +95,17 @@ fn repeat_expands_tuple_bindings() {
 }
 
 #[test]
+fn repeat_accepts_single_value_tuple_rows() {
+    let mut names = vec![];
+
+    repeat!((#T,) in [(TypeA,), (TypeB,)] {
+        names.push(stringify!(#T));
+    });
+
+    assert_eq!(names, ["TypeA", "TypeB"]);
+}
+
+#[test]
 fn repeat_accepts_trailing_comma_after_tuple_rows() {
     let mut values = vec![];
     let one = 1usize;

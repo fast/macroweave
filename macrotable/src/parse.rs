@@ -56,18 +56,22 @@ pub struct Table {
     pub rows: Vec<Vec<Ident>>,
 }
 
-struct Pattern {
-    slots: Vec<Slot>,
+enum Pattern {
+    Single(Slot),
+    Tuple(Vec<Slot>),
 }
 
 impl Pattern {
-    fn arity(&self) -> usize {
-        self.slots.len()
+    fn slots(&self) -> &[Slot] {
+        match self {
+            Self::Single(slot) => std::slice::from_ref(slot),
+            Self::Tuple(slots) => slots,
+        }
     }
 
     fn names(&self) -> Vec<Ident> {
         let mut names = vec![];
-        for slot in &self.slots {
+        for slot in self.slots() {
             if let Slot::Bind(ident) = slot {
                 names.push(ident.clone());
             }
@@ -76,8 +80,9 @@ impl Pattern {
     }
 
     fn bind(&self, values: Vec<Ident>) -> Result<Vec<Ident>> {
-        if values.len() != self.slots.len() {
-            let expected = self.slots.len();
+        let slots = self.slots();
+        if values.len() != slots.len() {
+            let expected = slots.len();
             let found = values.len();
             return Err(Error::new_spanned(
                 TokenStream::from_iter(values.into_iter().map(TokenTree::Ident)),
@@ -89,7 +94,7 @@ impl Pattern {
         }
 
         let mut bound_values = vec![];
-        for (slot, value) in self.slots.iter().zip(values) {
+        for (slot, value) in slots.iter().zip(values) {
             if matches!(slot, Slot::Bind(_)) {
                 bound_values.push(value);
             }
@@ -100,7 +105,7 @@ impl Pattern {
 
 impl Parse for Pattern {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let slots = if input.peek(syn::token::Paren) {
+        let pattern = if input.peek(syn::token::Paren) {
             let content;
             let paren = parenthesized!(content in input);
             let slots = parse_slots(&content)?;
@@ -110,13 +115,13 @@ impl Parse for Pattern {
                     "expected at least one binding in tuple pattern",
                 ));
             }
-            slots
+            Self::Tuple(slots)
         } else {
-            vec![input.parse::<Slot>()?]
+            Self::Single(input.parse::<Slot>()?)
         };
 
-        check_duplicate_names(&slots)?;
-        Ok(Self { slots })
+        check_duplicate_names(pattern.slots())?;
+        Ok(pattern)
     }
 }
 
@@ -173,16 +178,15 @@ fn check_duplicate_names(slots: &[Slot]) -> Result<()> {
 }
 
 fn parse_rows(input: ParseStream<'_>, pattern: &Pattern, span: proc_macro2::Span) -> Result<Table> {
-    let rows = if pattern.arity() == 1 {
-        Punctuated::<Ident, Token![,]>::parse_terminated(input)?
+    let rows = match pattern {
+        Pattern::Single(_) => Punctuated::<Ident, Token![,]>::parse_terminated(input)?
             .into_iter()
             .map(|value| pattern.bind(vec![value]))
-            .collect::<Result<Vec<_>>>()?
-    } else {
-        Punctuated::<Row, Token![,]>::parse_terminated(input)?
+            .collect::<Result<Vec<_>>>()?,
+        Pattern::Tuple(_) => Punctuated::<Row, Token![,]>::parse_terminated(input)?
             .into_iter()
             .map(|row| pattern.bind(row.values))
-            .collect::<Result<Vec<_>>>()?
+            .collect::<Result<Vec<_>>>()?,
     };
 
     if rows.is_empty() {
