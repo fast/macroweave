@@ -1,5 +1,0 @@
-error: binding variables must be written as `#name`
- --> tests/ui/err/nested_repeat_reuses_placeholder.rs:4:20
-  |
-4 |     repeat!(#T in [u8] {
-  |                    ^^

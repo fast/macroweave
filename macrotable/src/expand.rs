@@ -58,27 +58,23 @@ pub fn splice(input: TokenStream) -> Result<TokenStream> {
 }
 
 fn substitute_tokens(names: &[Ident], row: &[TokenStream], tokens: TokenStream) -> TokenStream {
-    let tokens = tokens.into_iter().collect::<Vec<_>>();
     let mut output = TokenStream::new();
 
-    let mut i = 0;
-    while i < tokens.len() {
-        if let Some((ident, consumed)) = read_hash_ident(&tokens[i..]) {
-            if let Some(index) = find_name(names, ident) {
-                output.extend(row[index].clone());
-                i += consumed;
-                continue;
+    for token in tokens {
+        match token {
+            TokenTree::Ident(ident) => {
+                if let Some(index) = find_name(names, &ident) {
+                    output.extend(row[index].clone());
+                } else {
+                    output.extend([TokenTree::Ident(ident)]);
+                }
             }
-        }
-
-        match &tokens[i] {
             TokenTree::Group(group) => {
                 let stream = substitute_tokens(names, row, group.stream());
-                output.extend([TokenTree::Group(group_with_stream(group, stream))]);
+                output.extend([TokenTree::Group(group_with_stream(&group, stream))]);
             }
-            token => output.extend([token.clone()]),
+            token => output.extend([token]),
         }
-        i += 1;
     }
 
     output
@@ -95,7 +91,7 @@ fn expand_splices(
 
     let mut i = 0;
     while i < tokens.len() {
-        if let Some(splice) = read_hash_repetition(&tokens[i..]) {
+        if let Some(splice) = read_repetition(&tokens[i..]) {
             found_splice = true;
 
             for (row_index, row) in table.rows.iter().enumerate() {
@@ -115,23 +111,20 @@ fn expand_splices(
             continue;
         }
 
-        if let Some((ident, consumed)) = read_hash_ident(&tokens[i..]) {
-            if current_names.contains(ident) {
-                let stream = TokenStream::from_iter(tokens[i..i + consumed].iter().cloned());
+        match &tokens[i] {
+            TokenTree::Group(group) => {
+                let (stream, group_found_splice) =
+                    expand_splices(table, current_names, group.stream())?;
+                found_splice |= group_found_splice;
+                output.extend([TokenTree::Group(group_with_stream(group, stream))]);
+            }
+            TokenTree::Ident(ident) if current_names.contains(ident) => {
                 return Err(Error::new_spanned(
-                    stream,
-                    format!("splice placeholder `#{ident}` must be used inside `#( ... )*`"),
+                    ident,
+                    format!("splice placeholder `{ident}` must be used inside `#( ... )*`"),
                 ));
             }
-        }
-
-        if let TokenTree::Group(group) = &tokens[i] {
-            let (stream, group_found_splice) =
-                expand_splices(table, current_names, group.stream())?;
-            found_splice |= group_found_splice;
-            output.extend([TokenTree::Group(group_with_stream(group, stream))]);
-        } else {
-            output.extend([tokens[i].clone()]);
+            token => output.extend([token.clone()]),
         }
         i += 1;
     }
@@ -145,7 +138,7 @@ struct Splice {
     consumed_len: usize,
 }
 
-fn read_hash_repetition(tokens: &[TokenTree]) -> Option<Splice> {
+fn read_repetition(tokens: &[TokenTree]) -> Option<Splice> {
     let [TokenTree::Punct(hash), TokenTree::Group(group), rest @ ..] = tokens else {
         return None;
     };
@@ -166,18 +159,6 @@ fn read_hash_repetition(tokens: &[TokenTree]) -> Option<Splice> {
             consumed_len: 4,
         }),
         _ => None,
-    }
-}
-
-fn read_hash_ident(tokens: &[TokenTree]) -> Option<(&Ident, usize)> {
-    let [TokenTree::Punct(hash), TokenTree::Ident(ident), ..] = tokens else {
-        return None;
-    };
-
-    if hash.as_char() == '#' {
-        Some((ident, 2))
-    } else {
-        None
     }
 }
 

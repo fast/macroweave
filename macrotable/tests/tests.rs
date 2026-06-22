@@ -27,9 +27,9 @@ trait TypeTag {
     const TAG: &'static str;
 }
 
-repeat!(#T in [TypeA, TypeB] {
-    impl TypeTag for #T {
-        const TAG: &'static str = stringify!(#T);
+repeat!(T in [TypeA, TypeB] {
+    impl TypeTag for T {
+        const TAG: &'static str = stringify!(T);
     }
 });
 
@@ -46,8 +46,8 @@ fn repeat_expands_statements() {
     let two = 2usize;
     let three = 3usize;
 
-    repeat!(#value in [one, two, three] {
-        values.push(#value);
+    repeat!(value in [one, two, three] {
+        values.push(value);
     });
 
     assert_eq!(values, [1, 2, 3]);
@@ -59,8 +59,8 @@ fn repeat_accepts_trailing_comma_in_input_list() {
     let one = 1usize;
     let two = 2usize;
 
-    repeat!(#value in [one, two,] {
-        values.push(#value);
+    repeat!(value in [one, two,] {
+        values.push(value);
     });
 
     assert_eq!(values, [1, 2]);
@@ -70,11 +70,11 @@ fn repeat_accepts_trailing_comma_in_input_list() {
 fn repeat_accepts_multi_token_input_items() {
     let mut count = 0usize;
 
-    repeat!(#T in [
+    repeat!(T in [
         std::option::Option<u8>,
         std::result::Result<u8, &'static str>,
     ] {
-        let _ = std::mem::size_of::<#T>();
+        let _ = std::mem::size_of::<T>();
         count += 1;
     });
 
@@ -82,14 +82,14 @@ fn repeat_accepts_multi_token_input_items() {
 }
 
 #[test]
-fn repeat_leaves_bare_identifiers_unchanged() {
+fn repeat_leaves_unmatched_identifiers_unchanged() {
     let mut values = vec![];
     let source = 1usize;
 
-    repeat!(#value in [source] {
+    repeat!(placeholder in [source] {
         let value = 2usize;
         values.push(value);
-        values.push(#value);
+        values.push(placeholder);
     });
 
     assert_eq!(values, [2, 1]);
@@ -101,9 +101,9 @@ fn repeat_expands_tuple_bindings() {
     let one = 1usize;
     let two = 2usize;
 
-    repeat!((#name, #value) in [(first, one), (second, two)] {
-        let #name = #value;
-        total += #name;
+    repeat!((name, value) in [(first, one), (second, two)] {
+        let name = value;
+        total += name;
     });
 
     assert_eq!(total, 3);
@@ -113,14 +113,14 @@ fn repeat_expands_tuple_bindings() {
 fn repeat_accepts_multi_token_tuple_row_values() {
     let mut count = 0usize;
 
-    repeat!((#T, #value) in [
+    repeat!((T, value) in [
         (std::option::Option<u8>, None::<u8>),
         (
             std::result::Result<u8, &'static str>,
             Ok::<u8, &'static str>(1u8),
         ),
     ] {
-        let _: #T = #value;
+        let _: T = value;
         count += 1;
     });
 
@@ -131,8 +131,8 @@ fn repeat_accepts_multi_token_tuple_row_values() {
 fn repeat_accepts_single_value_tuple_rows() {
     let mut names = vec![];
 
-    repeat!((#T,) in [(TypeA,), (TypeB,)] {
-        names.push(stringify!(#T));
+    repeat!((T,) in [(TypeA,), (TypeB,)] {
+        names.push(stringify!(T));
     });
 
     assert_eq!(names, ["TypeA", "TypeB"]);
@@ -144,9 +144,9 @@ fn repeat_accepts_trailing_comma_after_tuple_rows() {
     let one = 1usize;
     let two = 2usize;
 
-    repeat!((#name, #value) in [(first, one), (second, two),] {
-        let #name = #value;
-        values.push(#name);
+    repeat!((name, value) in [(first, one), (second, two),] {
+        let name = value;
+        values.push(name);
     });
 
     assert_eq!(values, [1, 2]);
@@ -156,8 +156,8 @@ fn repeat_accepts_trailing_comma_after_tuple_rows() {
 fn repeat_ignores_underscore_bindings() {
     let mut names = vec![];
 
-    repeat!((#T, _) in [(TypeA, one), (TypeB, two)] {
-        names.push(stringify!(#T));
+    repeat!((T, _) in [(TypeA, one), (TypeB, two)] {
+        names.push(stringify!(T));
     });
 
     assert_eq!(names, ["TypeA", "TypeB"]);
@@ -167,9 +167,9 @@ fn repeat_ignores_underscore_bindings() {
 fn repeat_expands_nested_repeats() {
     let mut names = vec![];
 
-    repeat!(#T in [TypeA, TypeB] {
-        repeat!(#U in [InputA, InputB] {
-            names.push(stringify!(#T #U));
+    repeat!(T in [TypeA, TypeB] {
+        repeat!(U in [InputA, InputB] {
+            names.push(stringify!(T U));
         });
     });
 
@@ -190,9 +190,9 @@ fn repeat_works_with_renamed_nested_macros_when_names_are_distinct() {
 
     let mut names = vec![];
 
-    repeat!(#T in [TypeA, TypeB] {
-        r!(#U in [#T] {
-            names.push(stringify!(#T #U));
+    repeat!(T in [TypeA, TypeB] {
+        r!(U in [T] {
+            names.push(stringify!(T U));
         });
     });
 
@@ -207,8 +207,8 @@ fn repeat_preserves_hash_paren_non_repetition_for_downstream_macros() {
         };
     }
 
-    repeat!(#value in [source] {
-        let tokens = stringify_tokens! { #( #value )+ };
+    repeat!(value in [source] {
+        let tokens = stringify_tokens! { #( value )+ };
     });
 
     assert_eq!(tokens, "# (source) +");
@@ -221,9 +221,9 @@ enum MyType {
 }
 
 fn describe(value: MyType) -> String {
-    splice!(#C in [CaseA, CaseB] {
+    splice!(C in [CaseA, CaseB] {
         match value {
-            #( MyType::#C(value) => value.to_string(), )*
+            #( MyType::C(value) => value.to_string(), )*
             MyType::Other(_) => String::new(),
         }
     })
@@ -236,10 +236,10 @@ fn splice_expands_match_arms() {
     assert_eq!(describe(MyType::Other(3)), "");
 }
 
-splice!(#Variant in [First, Second] {
+splice!(Variant in [First, Second] {
     #[derive(Debug, PartialEq, Eq)]
     enum SpliceEnum {
-        #( #Variant ),*,
+        #( Variant ),*,
         Other,
     }
 });
@@ -253,9 +253,9 @@ fn splice_expands_enum_variants() {
 
 #[test]
 fn splice_expands_multiple_fragments_from_the_same_list() {
-    splice!(#Variant in [First, Second] {
-        let names = [#( stringify!(#Variant) ),*];
-        let values = [#( SpliceEnum::#Variant ),*];
+    splice!(Variant in [First, Second] {
+        let names = [#( stringify!(Variant) ),*];
+        let values = [#( SpliceEnum::Variant ),*];
     });
 
     assert_eq!(names, ["First", "Second"]);
@@ -269,8 +269,8 @@ fn splice_expands_without_separator() {
     let two = 2usize;
     let three = 3usize;
 
-    splice!(#value in [one, two, three] {
-        #( values.push(#value); )*
+    splice!(value in [one, two, three] {
+        #( values.push(value); )*
     });
 
     assert_eq!(values, [1, 2, 3]);
@@ -278,8 +278,8 @@ fn splice_expands_without_separator() {
 
 #[test]
 fn splice_accepts_multi_token_input_items() {
-    splice!(#value in [1 + 1, 2 + 2] {
-        let values = [#( #value ),*];
+    splice!(value in [1 + 1, 2 + 2] {
+        let values = [#( value ),*];
     });
 
     assert_eq!(values, [2, 4]);
@@ -293,8 +293,8 @@ fn splice_accepts_token_tree_separator() {
         };
     }
 
-    splice!(#word in [first, second] {
-        let tokens = stringify_tokens! { #( #word )(separator)* };
+    splice!(word in [first, second] {
+        let tokens = stringify_tokens! { #( word )(separator)* };
     });
 
     assert_eq!(tokens, "first(separator) second");

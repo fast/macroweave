@@ -1,5 +1,5 @@
 error: rows for tuple bindings must use parentheses, such as `(u16, Small)`
- --> tests/ui/err/bracketed_tuple_row.rs:4:29
+ --> tests/ui/err/bracketed_tuple_row.rs:4:27
   |
-4 |     repeat!((#T, #Kind) in [[u16, Small]] {
-  |                             ^^^^^^^^^^^^
+4 |     repeat!((T, Kind) in [[u16, Small]] {
+  |                           ^^^^^^^^^^^^

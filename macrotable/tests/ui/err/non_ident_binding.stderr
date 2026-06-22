@@ -1,0 +1,5 @@
+error: expected identifier
+ --> tests/ui/err/non_ident_binding.rs:4:13
+  |
+4 |     repeat!(1 in [u8] {});
+  |             ^

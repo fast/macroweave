@@ -1,5 +1,5 @@
-error: splice placeholder `#T` must be used inside `#( ... )*`
+error: splice placeholder `T` must be used inside `#( ... )*`
  --> tests/ui/err/splice_placeholder_outside_repetition.rs:5:28
   |
-5 |         let _ = stringify!(#T);
-  |                            ^^
+5 |         let _ = stringify!(T);
+  |                            ^

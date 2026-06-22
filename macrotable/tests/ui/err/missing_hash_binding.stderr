@@ -1,5 +1,0 @@
-error: binding variables must be written as `#name`
- --> tests/ui/err/missing_hash_binding.rs:4:13
-  |
-4 |     repeat!(T in [u8] {});
-  |             ^

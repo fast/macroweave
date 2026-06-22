@@ -1,5 +1,5 @@
 error: expected value before comma
- --> tests/ui/err/empty_input_value.rs:4:28
+ --> tests/ui/err/empty_input_value.rs:4:27
   |
-4 |     repeat!(#value in [one,, two] {
-  |                            ^
+4 |     repeat!(value in [one,, two] {
+  |                           ^

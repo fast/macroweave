@@ -1,5 +1,5 @@
 use macrotable::repeat;
 
 fn main() {
-    repeat!(T in [u8] {});
+    repeat!(1 in [u8] {});
 }

@@ -1,7 +1,7 @@
 use macrotable::repeat;
 
 fn main() {
-    repeat!((#T, #T) in [(u8, u16)] {
-        let _ = stringify!(#T);
+    repeat!((T, T) in [(u8, u16)] {
+        let _ = stringify!(T);
     });
 }

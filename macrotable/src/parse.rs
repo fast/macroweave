@@ -138,11 +138,6 @@ impl Parse for Slot {
             return Ok(Self::Ignore);
         }
 
-        if !input.peek(Token![#]) {
-            return Err(input.error("binding variables must be written as `#name`"));
-        }
-
-        input.parse::<Token![#]>()?;
         Ok(Self::Bind(input.parse::<Ident>()?))
     }
 }
@@ -163,11 +158,11 @@ fn check_duplicate_names(slots: &[Slot]) -> Result<()> {
         if let Some(previous) = names.iter().copied().find(|previous| previous == &ident) {
             let mut error = Error::new_spanned(
                 ident,
-                format!("the binding variable `#{ident}` is declared more than once"),
+                format!("the binding variable `{ident}` is declared more than once"),
             );
             error.combine(Error::new_spanned(
                 previous,
-                format!("the first `#{previous}` binding is here"),
+                format!("the first `{previous}` binding is here"),
             ));
             return Err(error);
         }

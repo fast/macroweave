@@ -56,15 +56,15 @@ enum QueryValue {
     Unsigned(u128),
 }
 
-repeat!((#T, #Variant, #Out) in [
+repeat!((T, Variant, Out) in [
     (i8, Signed, i128),
     (i16, Signed, i128),
     (u8, Unsigned, u128),
     (u16, Unsigned, u128),
 ] {
-    impl From<#T> for QueryValue {
-        fn from(value: #T) -> Self {
-            QueryValue::#Variant(value as #Out)
+    impl From<T> for QueryValue {
+        fn from(value: T) -> Self {
+            QueryValue::Variant(value as Out)
         }
     }
 });
@@ -80,16 +80,16 @@ Use `splice!` when one Rust construct needs repeated pieces inside it:
 ```rust
 use macrotable::splice;
 
-splice!(#Command in [Build, Test, Publish] {
+splice!(Variant in [Build, Test, Publish] {
     #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     enum Command {
-        #( #Command, )*
+        #( Variant, )*
     }
 
     impl Command {
         fn as_str(self) -> &'static str {
             match self {
-                #( Command::#Command => stringify!(#Command), )*
+                #( Command::Variant => stringify!(Variant), )*
             }
         }
     }

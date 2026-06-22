@@ -24,8 +24,8 @@ trait IntoMetricValue {
     fn into_metric_value(self) -> MetricValue;
 }
 
-repeat!(#T in [u8, u16, u32, u64, usize] {
-    impl IntoMetricValue for #T {
+repeat!(T in [u8, u16, u32, u64, usize] {
+    impl IntoMetricValue for T {
         fn into_metric_value(self) -> MetricValue {
             MetricValue::Unsigned(self as u128)
         }
@@ -40,8 +40,8 @@ struct WorkerStats {
 
 impl WorkerStats {
     fn counters(&self) -> [(&'static str, usize); 3] {
-        splice!(#field in [queued, running, failed] {
-            [ #( (stringify!(#field), self.#field) ),* ]
+        splice!(field in [queued, running, failed] {
+            [ #( (stringify!(field), self.field) ),* ]
         })
     }
 }

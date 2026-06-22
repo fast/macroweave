@@ -1,11 +1,11 @@
-error: the binding variable `#T` is declared more than once
- --> tests/ui/err/duplicate_binding.rs:4:19
+error: the binding variable `T` is declared more than once
+ --> tests/ui/err/duplicate_binding.rs:4:17
   |
-4 |     repeat!((#T, #T) in [(u8, u16)] {
-  |                   ^
+4 |     repeat!((T, T) in [(u8, u16)] {
+  |                 ^
 
-error: the first `#T` binding is here
- --> tests/ui/err/duplicate_binding.rs:4:15
+error: the first `T` binding is here
+ --> tests/ui/err/duplicate_binding.rs:4:14
   |
-4 |     repeat!((#T, #T) in [(u8, u16)] {
-  |               ^
+4 |     repeat!((T, T) in [(u8, u16)] {
+  |              ^

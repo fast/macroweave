@@ -39,8 +39,8 @@
 //!     fn into_metric_value(self) -> MetricValue;
 //! }
 //!
-//! repeat!(#T in [u8, u16, u32, u64, usize] {
-//!     impl IntoMetricValue for #T {
+//! repeat!(T in [u8, u16, u32, u64, usize] {
+//!     impl IntoMetricValue for T {
 //!         fn into_metric_value(self) -> MetricValue {
 //!             MetricValue::Unsigned(self as u128)
 //!         }
@@ -66,10 +66,10 @@
 //!     fn wire_kind() -> WireKind;
 //! }
 //!
-//! repeat!((#T, #Kind) in [(u16, Small), (u64, Large)] {
-//!     impl WireType for #T {
+//! repeat!((T, Kind) in [(u16, Small), (u64, Large)] {
+//!     impl WireType for T {
 //!         fn wire_kind() -> WireKind {
-//!             WireKind::#Kind
+//!             WireKind::Kind
 //!         }
 //!     }
 //! });
@@ -96,8 +96,8 @@
 //!
 //! impl WorkerStats {
 //!     fn counters(&self) -> [(&'static str, usize); 3] {
-//!         splice!(#field in [queued, running, failed] {
-//!             [ #( (stringify!(#field), self.#field) ),* ]
+//!         splice!(field in [queued, running, failed] {
+//!             [ #( (stringify!(field), self.field) ),* ]
 //!         })
 //!     }
 //! }
@@ -117,10 +117,10 @@
 //! `splice!` uses quote-style repetition syntax:
 //!
 //! ```rust,ignore
-//! #( #name )*            // no separator
-//! #( #name ),*           // comma separator
-//! #( field: #name, )*    // punctuation in every repeated fragment
-//! #( #key => #value, )*  // tuple rows work inside fragments
+//! #( name )*            // no separator
+//! #( name ),*           // comma separator
+//! #( field: name, )*    // punctuation in every repeated fragment
+//! #( key => value, )*   // tuple rows work inside fragments
 //! ```
 //!
 //! The token before `*` is used as the separator when it is written outside the
@@ -138,14 +138,14 @@
 //!     failed: usize,
 //! }
 //!
-//! splice!(#field in [queued, running, failed] {
+//! splice!(field in [queued, running, failed] {
 //!     const COUNTER_NAMES: &[&str] = &[
-//!         #( stringify!(#field) ),*
+//!         #( stringify!(field) ),*
 //!     ];
 //!
 //!     fn empty_stats() -> WorkerStats {
 //!         WorkerStats {
-//!             #( #field: 0 ),*
+//!             #( field: 0 ),*
 //!         }
 //!     }
 //! });
@@ -160,8 +160,8 @@
 //!
 //! # Placeholders and Input
 //!
-//! Bind placeholders as `#name` and use them as `#name`. Bare identifiers are
-//! left unchanged.
+//! Bind placeholders as `name` and use them as `name`. Identifiers matching a
+//! placeholder name are replaced; other identifiers are left unchanged.
 //!
 //! Each list entry can contain one or more Rust tokens, such as a path, type,
 //! expression, or grouped syntax. Separate entries with commas at the list level.
@@ -169,11 +169,11 @@
 //! ```rust
 //! use macrotable::repeat;
 //!
-//! repeat!(#T in [
+//! repeat!(T in [
 //!     std::option::Option<u8>,
 //!     std::result::Result<u8, &'static str>,
 //! ] {
-//!     let _ = std::mem::size_of::<#T>();
+//!     let _ = std::mem::size_of::<T>();
 //! });
 //! ```
 //!
@@ -196,11 +196,11 @@
 //!     fn from_stats(stats: &WorkerStats) -> Self;
 //! }
 //!
-//! repeat!(#T in [u64, usize] {
-//!     impl FromStats for Vec<#T> {
+//! repeat!(T in [u64, usize] {
+//!     impl FromStats for Vec<T> {
 //!         fn from_stats(stats: &WorkerStats) -> Self {
-//!             splice!(#field in [queued, running] {
-//!                 vec![ #( stats.#field as #T ),* ]
+//!             splice!(field in [queued, running] {
+//!                 vec![ #( stats.field as T ),* ]
 //!             })
 //!         }
 //!     }
@@ -215,7 +215,7 @@
 //! assert_eq!(<Vec<usize> as FromStats>::from_stats(&stats), vec![4, 2]);
 //! ```
 //!
-//! The outer `repeat!` replaces `#T` before the nested `splice!` invocation
+//! The outer `repeat!` replaces `T` before the nested `splice!` invocation
 //! runs.
 //!
 //! # Invocation Style
@@ -224,8 +224,8 @@
 //! the repeated body:
 //!
 //! ```rust,ignore
-//! repeat!(#T in [u8, u16] {
-//!     impl IntoMetricValue for #T {
+//! repeat!(T in [u8, u16] {
+//!     impl IntoMetricValue for T {
 //!         // ...
 //!     }
 //! });
@@ -238,7 +238,7 @@
 //!
 //! The macros report compile errors for malformed input, including:
 //!
-//! - missing `#` in a binding,
+//! - binding names that are not identifiers,
 //! - tuple pattern and tuple row arity mismatches,
 //! - empty input lists or empty input values,
 //! - current `splice!` placeholders used outside `#( ... )*`,
