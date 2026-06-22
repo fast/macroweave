@@ -63,12 +63,12 @@ fn substitute_tokens(names: &[Ident], row: &[Ident], tokens: TokenStream) -> Tok
 
     let mut i = 0;
     while i < tokens.len() {
-        if let Some((ident, consumed)) = read_hash_ident(&tokens[i..])
-            && let Some(index) = find_name(names, ident)
-        {
-            output.extend([TokenTree::Ident(row[index].clone())]);
-            i += consumed;
-            continue;
+        if let Some((ident, consumed)) = read_hash_ident(&tokens[i..]) {
+            if let Some(index) = find_name(names, ident) {
+                output.extend([TokenTree::Ident(row[index].clone())]);
+                i += consumed;
+                continue;
+            }
         }
 
         match &tokens[i] {
@@ -99,10 +99,10 @@ fn expand_splices(
             found_splice = true;
 
             for (row_index, row) in table.rows.iter().enumerate() {
-                if row_index > 0
-                    && let Some(separator) = &splice.separator
-                {
-                    output.extend([separator.clone()]);
+                if row_index > 0 {
+                    if let Some(separator) = &splice.separator {
+                        output.extend([separator.clone()]);
+                    }
                 }
                 output.extend(substitute_tokens(
                     &table.names,
@@ -115,14 +115,14 @@ fn expand_splices(
             continue;
         }
 
-        if let Some((ident, consumed)) = read_hash_ident(&tokens[i..])
-            && current_names.contains(ident)
-        {
-            let stream = TokenStream::from_iter(tokens[i..i + consumed].iter().cloned());
-            return Err(Error::new_spanned(
-                stream,
-                format!("splice placeholder `#{ident}` must be used inside `#( ... )*`"),
-            ));
+        if let Some((ident, consumed)) = read_hash_ident(&tokens[i..]) {
+            if current_names.contains(ident) {
+                let stream = TokenStream::from_iter(tokens[i..i + consumed].iter().cloned());
+                return Err(Error::new_spanned(
+                    stream,
+                    format!("splice placeholder `#{ident}` must be used inside `#( ... )*`"),
+                ));
+            }
         }
 
         if let TokenTree::Group(group) = &tokens[i] {
