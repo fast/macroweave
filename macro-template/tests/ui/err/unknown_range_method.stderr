@@ -1,5 +1,0 @@
-error: unknown range input method
- --> tests/ui/err/unknown_range_method.rs:5:26
-  |
-5 |         for N in (0..=3).step_by() {
-  |                          ^^^^^^^

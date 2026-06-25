@@ -1,5 +1,0 @@
-error: range input must contain at least one value
- --> tests/ui/err/empty_range_input.rs:5:18
-  |
-5 |         for N in 0..0 {
-  |                  ^^^^

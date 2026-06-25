@@ -1,5 +1,0 @@
-error: range bounds must use the same integer suffix
- --> tests/ui/err/range_suffix_mismatch.rs:5:24
-  |
-5 |         for N in 0u8..=2u16 {
-  |                        ^^^^

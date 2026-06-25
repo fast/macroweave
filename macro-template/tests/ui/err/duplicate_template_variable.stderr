@@ -1,5 +1,0 @@
-error: duplicate template variable
- --> tests/ui/err/duplicate_template_variable.rs:5:18
-  |
-5 |         for (Ty, Ty) in [
-  |                  ^^

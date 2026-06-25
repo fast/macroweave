@@ -1,0 +1,5 @@
+error: this row provides 1 value, but the binding pattern expects 2
+ --> tests/ui/err/row_arity_mismatch.rs:4:29
+  |
+4 |     repeat!((T, value) in [(u8)] {
+  |                             ^^

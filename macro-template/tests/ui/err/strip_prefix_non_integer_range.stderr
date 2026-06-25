@@ -1,5 +1,0 @@
-error: strip_prefix is only supported on integer ranges
- --> tests/ui/err/strip_prefix_non_integer_range.rs:5:19
-  |
-5 |         for C in ('a'..='c').strip_prefix() {
-  |                   ^^^^^^^^^

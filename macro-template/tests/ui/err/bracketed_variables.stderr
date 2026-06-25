@@ -1,5 +1,0 @@
-error: multiple template variables must use parentheses, such as `(Ty, Width)`
- --> tests/ui/err/bracketed_variables.rs:5:13
-  |
-5 |         for [Ty, Width] in [
-  |             ^

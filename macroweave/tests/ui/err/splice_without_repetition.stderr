@@ -1,0 +1,9 @@
+error: expected at least one `#( ... )*` repetition
+ --> tests/ui/err/splice_without_repetition.rs:4:5
+  |
+4 | /     splice!(T in [u8] {
+5 | |         let _ = 0;
+6 | |     });
+  | |______^
+  |
+  = note: this error originates in the macro `splice` (in Nightly builds, run with -Z macro-backtrace for more info)

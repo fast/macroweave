@@ -1,5 +1,0 @@
-error: range input methods do not accept arguments
- --> tests/ui/err/range_method_with_argument.rs:5:30
-  |
-5 |         for N in (0..=3).rev(true) {
-  |                              ^^^^
