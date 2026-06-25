@@ -1,4 +1,4 @@
-use macrotable::splice;
+use macroweave::splice;
 
 fn main() {
     splice!(T in [u8] {

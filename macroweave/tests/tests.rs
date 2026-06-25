@@ -15,8 +15,8 @@
 #![allow(dead_code)]
 #![allow(clippy::vec_init_then_push)]
 
-use macrotable::repeat;
-use macrotable::splice;
+use macroweave::repeat;
+use macroweave::splice;
 
 struct TypeA;
 struct TypeB;
@@ -186,7 +186,7 @@ fn repeat_expands_nested_repeats() {
 
 #[test]
 fn repeat_works_with_renamed_nested_macros_when_names_are_distinct() {
-    use macrotable::repeat as r;
+    use macroweave::repeat as r;
 
     let mut names = vec![];
 

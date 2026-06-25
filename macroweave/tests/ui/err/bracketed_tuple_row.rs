@@ -1,4 +1,4 @@
-use macrotable::repeat;
+use macroweave::repeat;
 
 fn main() {
     repeat!((T, Kind) in [[u16, Small]] {

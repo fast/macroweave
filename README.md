@@ -1,4 +1,4 @@
-# macrotable
+# macroweave
 
 [![Crates.io][crates-badge]][crates-url]
 [![Documentation][docs-badge]][docs-url]
@@ -6,107 +6,128 @@
 [![Apache 2.0 licensed][license-badge]][license-url]
 [![Build Status][actions-badge]][actions-url]
 
-[crates-badge]: https://img.shields.io/crates/v/macrotable.svg
-[crates-url]: https://crates.io/crates/macrotable
-[docs-badge]: https://img.shields.io/docsrs/macrotable
-[docs-url]: https://docs.rs/macrotable
+[crates-badge]: https://img.shields.io/crates/v/macroweave.svg
+[crates-url]: https://crates.io/crates/macroweave
+[docs-badge]: https://img.shields.io/docsrs/macroweave
+[docs-url]: https://docs.rs/macroweave
 [msrv-badge]: https://img.shields.io/badge/MSRV-1.85-green?logo=rust
-[license-badge]: https://img.shields.io/crates/l/macrotable
+[license-badge]: https://img.shields.io/crates/l/macroweave
 [license-url]: LICENSE
 [actions-badge]: https://github.com/fast/macro-template/workflows/CI/badge.svg
 [actions-url]: https://github.com/fast/macro-template/actions?query=workflow%3ACI
 
-`macrotable` provides two function-like procedural macros for small
-compile-time repetitions over comma-separated Rust token sequences.
-
-- `repeat!` emits the whole body once per input row.
-- `splice!` emits the body once and expands `#( ... )*` fragments inside it.
+`macroweave` provides `repeat!` and `splice!`, procedural macros for generating
+repeated Rust code from compact, table-driven inputs.
 
 ## Install
 
 ```toml
 [dependencies]
-macrotable = "0.1"
+macroweave = "0.1"
 ```
 
 ## Motivation
 
-Use `macrotable` when the repetition is Rust syntax, not runtime control flow.
-Typical cases include repeated trait impls, match arms, enum variants, arrays,
-function arguments, and macro arguments.
+`macroweave` is for repetition that has to become Rust syntax, not runtime
+control flow. You write the choices once, name the columns, and use those names
+in Rust syntax.
 
-Function-like macros are a good fit when the repeated code does not belong to
-one item that an attribute or derive macro can annotate.
+That is the table-driven case `macroweave` is built around:
 
-Each list entry can contain one or more Rust tokens, such as a path, type,
-expression, or grouped syntax. Separate entries with commas at the list level.
+```rust
+use macroweave::repeat;
+
+trait ReadLe {
+    fn read_le(input: &[u8]) -> Self;
+}
+
+repeat!((Ty, Width) in [
+    (u16, 2),
+    (u32, 4),
+    (u64, 8),
+] {
+    impl ReadLe for Ty {
+        fn read_le(input: &[u8]) -> Self {
+            Ty::from_le_bytes(input[..Width].try_into().unwrap())
+        }
+    }
+});
+
+assert_eq!(u16::read_le(&[0x34, 0x12]), 0x1234);
+assert_eq!(u32::read_le(&[1, 0, 0, 0]), 1);
+```
+
+This cannot be written as an ordinary for-loop because `Ty` and `Width` need to
+be substituted as tokens before the generated code is type-checked.
 
 ## Examples
 
 ### Whole-body repetition
 
-Use `repeat!` when each expansion is a complete item or statement:
+Without splice syntax, `repeat!` emits the whole body once per input row:
 
 ```rust
-use macrotable::repeat;
+use macroweave::repeat;
 
-#[derive(Debug, PartialEq, Eq)]
-enum QueryValue {
-    Signed(i128),
-    Unsigned(u128),
+trait TypeName {
+    const NAME: &'static str;
 }
 
-repeat!((T, Variant, Out) in [
-    (i8, Signed, i128),
-    (i16, Signed, i128),
-    (u8, Unsigned, u128),
-    (u16, Unsigned, u128),
+repeat!((Ty, Name) in [
+    (u8, "u8"),
+    (u16, "u16"),
+    (u32, "u32"),
 ] {
-    impl From<T> for QueryValue {
-        fn from(value: T) -> Self {
-            QueryValue::Variant(value as Out)
-        }
+    impl TypeName for Ty {
+        const NAME: &'static str = Name;
     }
 });
 
-assert_eq!(QueryValue::from(-7i16), QueryValue::Signed(-7));
-assert_eq!(QueryValue::from(42u16), QueryValue::Unsigned(42));
+assert_eq!(<u16 as TypeName>::NAME, "u16");
 ```
 
 ### Partial repetition
 
-Use `splice!` when one Rust construct needs repeated pieces inside it:
+When only part of a surrounding construct should repeat, put that part in
+`#( ... )*`. A single separator token tree can be written before `*`, such as
+`#( ... ),*` for comma-separated output:
 
 ```rust
-use macrotable::splice;
+use macroweave::splice;
 
-splice!(Variant in [Build, Test, Publish] {
-    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-    enum Command {
-        #( Variant, )*
-    }
-
-    impl Command {
-        fn as_str(self) -> &'static str {
-            match self {
-                #( Command::Variant => stringify!(Variant), )*
-            }
+fn keyword_code(text: &str) -> Option<u8> {
+    splice!((Pat, Code) in [
+        ("async", 1u8),
+        ("await", 2u8),
+    ] {
+        match text {
+            #(Pat => Some(Code)),*,
+            _ => None,
         }
-    }
-});
+    })
+}
 
-assert_eq!(Command::Build.as_str(), "Build");
-assert_eq!(Command::Publish.as_str(), "Publish");
+assert_eq!(keyword_code("async"), Some(1));
+assert_eq!(keyword_code("await"), Some(2));
+assert_eq!(keyword_code("fn"), None);
 ```
 
-`#( ... ),*` repeats without a trailing comma. Put the comma inside the
-fragment, as in `#( ..., )*`, when every repeated item should carry it.
+When a `splice!` body contains `#( ... )*` or `#( ... ),*`, placeholders are
+substituted only inside the splice body, and the surrounding tokens are emitted
+once. Surrounding identifiers stay literal, even when they have the same name as
+a placeholder. If a value should vary, place it in the splice body.
 
-Run a complete example that combines both macros:
+`#( ..., )*` and `#( ... ),*` are different: the latter does not produce a
+trailing comma. This matches delimiter repetition in `macro_rules!`.
 
-```sh
-cargo run --example metrics
-```
+## Syntax notes
+
+- Bind placeholders as bare identifiers, such as `Ty` or `Name`.
+- Tuple rows bind multiple placeholders, and `_` skips a row value.
+- Row values can contain one or more Rust tokens. Top-level commas separate
+  rows.
+- Nested invocations are supported. Use different placeholder names at each
+  level.
 
 ## Minimum Rust version policy
 
