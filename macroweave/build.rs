@@ -25,7 +25,7 @@ fn main() {
     let readme = if readme.exists() {
         readme
     } else {
-        eprintln!("Warning: README.md not found, skipping documentation extraction");
+        println!("cargo:warning=readme file does not exist; skipping docs extraction");
         return;
     };
     println!("cargo:rerun-if-changed={}", readme.display());
